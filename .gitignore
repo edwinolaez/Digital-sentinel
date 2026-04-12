@@ -1,0 +1,11 @@
+.env
+.sentinel_env/
+credentials.json
+token.json
+__pycache__/
+*.pyc
+profile.json
+usage_log.json
+applications.json
+career_page_snapshots.json
+.adk/
