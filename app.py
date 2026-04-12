@@ -57,17 +57,20 @@ async def _call_agent(message: str) -> str:
 
 
 # ── Chat handler ──────────────────────────────────────────────────────────────
-# history format: list of [user_str, bot_str] pairs
+# Gradio 6.12 Chatbot uses MessageDict format: {"role": "user"|"assistant", "content": str}
 
 async def respond(message: str, history: list) -> tuple[list, str]:
     if not message.strip():
         return history, ""
-    history = history + [[message, None]]
+    history = history + [
+        {"role": "user",      "content": message},
+        {"role": "assistant", "content": "..."},
+    ]
     try:
         reply = await _call_agent(message)
     except Exception as e:
         reply = f"[Error] {e}"
-    history[-1][1] = reply
+    history[-1]["content"] = reply
     return history, ""
 
 
@@ -157,7 +160,9 @@ body, .gradio-container {
     border-top: none !important;
     border-radius: 0 !important;
 }
-#chatbox .user, #chatbox .message.user {
+#chatbox .user, #chatbox .message.user,
+#chatbox [data-testid="user"] .bubble-wrap,
+#chatbox .bubble-wrap.user {
     background: #3b82f6 !important;
     color: #ffffff !important;
     border-radius: 16px 16px 4px 16px !important;
@@ -165,7 +170,9 @@ body, .gradio-container {
     margin-left: auto !important;
     max-width: 78% !important;
 }
-#chatbox .bot, #chatbox .message.bot {
+#chatbox .bot, #chatbox .message.bot,
+#chatbox [data-testid="bot"] .bubble-wrap,
+#chatbox .bubble-wrap.bot {
     background: #eef1f6 !important;
     color: #1a202c !important;
     border-radius: 16px 16px 16px 4px !important;
@@ -289,7 +296,7 @@ def build_ui() -> gr.Blocks:
                 b = gr.Button(label, elem_classes=["qbtn"], size="sm")
                 quick_btns.append(b)
 
-        # Chatbot
+        # Chatbot — Gradio 6.12 uses MessageDict format natively
         chatbot = gr.Chatbot(
             value=[],
             elem_id="chatbox",
