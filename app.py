@@ -321,7 +321,19 @@ body, .gradio-container {
     margin-bottom: 6px;
 }
 #drafts-dropdown { margin-bottom: 6px; }
-#drafts-dropdown .wrap { border-color: #99f6e4 !important; }
+#drafts-dropdown .wrap,
+#drafts-dropdown .wrap-inner,
+#drafts-dropdown input,
+#drafts-dropdown select { border-color: #99f6e4 !important; color: #1a202c !important; background: #ffffff !important; }
+#drafts-dropdown .options,
+#drafts-dropdown ul,
+#drafts-dropdown [role="listbox"] { background: #ffffff !important; border: 1px solid #99f6e4 !important; }
+#drafts-dropdown .item,
+#drafts-dropdown li,
+#drafts-dropdown option,
+#drafts-dropdown [role="option"] { color: #1a202c !important; background: #ffffff !important; }
+#drafts-dropdown .item:hover,
+#drafts-dropdown [role="option"]:hover { background: #f0fdf9 !important; }
 #drafts-content textarea {
     background: #ffffff !important;
     color: #1a202c !important;
@@ -409,7 +421,23 @@ const DARK_CSS = `
   #drafts-btn { background: #0f766e !important; color: #fff !important; }
   #drafts-viewer-panel { background: #0d1f1e !important; border-color: #134e4a !important; }
   #drafts-viewer-label { color: #2dd4bf !important; }
-  #drafts-dropdown .wrap { border-color: #134e4a !important; background: #0f172a !important; }
+  /* ── Drafts dropdown: every part ── */
+  #drafts-dropdown .wrap,
+  #drafts-dropdown .wrap-inner,
+  #drafts-dropdown input,
+  #drafts-dropdown select { background: #0f172a !important; color: #f1f5f9 !important; border-color: #134e4a !important; }
+  #drafts-dropdown * { color: #f1f5f9 !important; }
+  #drafts-dropdown .options,
+  #drafts-dropdown ul,
+  #drafts-dropdown [role="listbox"] { background: #1e293b !important; border: 1px solid #134e4a !important; }
+  #drafts-dropdown .item,
+  #drafts-dropdown li,
+  #drafts-dropdown option,
+  #drafts-dropdown [role="option"] { background: #1e293b !important; color: #f1f5f9 !important; }
+  #drafts-dropdown .item:hover,
+  #drafts-dropdown li:hover,
+  #drafts-dropdown [role="option"]:hover,
+  #drafts-dropdown .item.selected { background: #134e4a !important; color: #f1f5f9 !important; }
   #drafts-content textarea { background: #0f172a !important; color: #f1f5f9 !important; border-color: #134e4a !important; }
   #refresh-btn { background: #0f766e !important; }
   #theme-btn { background: #475569 !important; }
