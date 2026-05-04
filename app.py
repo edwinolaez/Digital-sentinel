@@ -260,6 +260,16 @@ body, .gradio-container {
     height: 42px !important;
 }
 #resume-gen-btn:hover { background: #6d28d9 !important; }
+#drafts-btn {
+    background: #0f766e !important;
+    color: #fff !important;
+    border: none !important;
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+    height: 42px !important;
+    margin-top: 6px !important;
+}
+#drafts-btn:hover { background: #0d6460 !important; }
 #resume-panel-label {
     font-size: .78rem;
     font-weight: 600;
@@ -333,6 +343,7 @@ const DARK_CSS = `
   #resume-panel  { background: #1a1f35 !important; border-color: #334155 !important; }
   #resume-panel-label { color: #a78bfa !important; }
   #resume-job-input textarea { background: #0f172a !important; color: #f1f5f9 !important; border-color: #334155 !important; }
+  #drafts-btn { background: #0f766e !important; color: #fff !important; }
   #theme-btn { background: #475569 !important; }
   .message-wrap, .wrap { background: #1e293b !important; }
   ::-webkit-scrollbar-thumb { background: #475569 !important; }
@@ -439,6 +450,11 @@ def build_ui() -> gr.Blocks:
                     elem_id="resume-gen-btn",
                     variant="primary",
                 )
+                drafts_btn = gr.Button(
+                    "View Saved Drafts",
+                    elem_id="drafts-btn",
+                    variant="secondary",
+                )
 
         # ── Wire events ───────────────────────────────────────────────────────
 
@@ -463,6 +479,13 @@ def build_ui() -> gr.Blocks:
             fn=_build_resume_prompt,
             inputs=[resume_job_input],
             outputs=[msg_box, resume_job_input],
+        ).then(
+            respond, [msg_box, chatbot], [chatbot, msg_box]
+        )
+
+        drafts_btn.click(
+            fn=lambda: "show my drafts",
+            outputs=msg_box,
         ).then(
             respond, [msg_box, chatbot], [chatbot, msg_box]
         )
