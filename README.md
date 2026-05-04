@@ -13,7 +13,7 @@ Digital Sentinel is a fully local, multi-agent AI assistant that runs on your ma
 | **Email & Career Scout** | Sweeps Gmail + Yahoo simultaneously for job leads, filters for entry-level software roles, flags phishing/scam subjects automatically |
 | **Clone Guard** | Audits any GitHub repo for red flags before you clone or fork it — returns SAFE / CAUTION / DANGEROUS |
 | **GitHub Trend Intelligence** | Fetches the fastest-rising repos across 8 tech categories, then uses Gemini to synthesise career-relevant learning recommendations |
-| **Job Hunting** | Pulls live postings from RemoteOK + Arbeitnow, monitors 12 Calgary/Canadian company career pages for new listings, tracks every application you log |
+| **Job Hunting** | Pulls live postings from RemoteOK + Arbeitnow + **Canada Job Bank** (Calgary/AB — primary resource used by SAIT career advisors, Centre for Newcomers, CCIS, and ACCES Employment); monitors 12 Calgary company career pages; tracks every application you log. Always surfaces a Career Support Resources section with links to free Calgary/Canada career services |
 | **Resume & Cover Letter Generator** | Dedicated dashboard panel — paste a job URL or description, get a full functional resume (Professional Summary → Highlights → Skills → PAR-format Experience bullets → Work History → Education) plus a 3-paragraph cover letter, auto-saved as a draft |
 | **Cold Outreach** | Writes personalised cold emails + LinkedIn messages using your real background; 4-6 sentence max, specific, single ask |
 | **Profile Manager** | Single source of truth for all agents — edit your skills, projects, goals, and preferences through natural conversation |
@@ -148,7 +148,11 @@ MISSION 3 — GITHUB TREND INTELLIGENCE
   what should I learn next
 
 MISSION 4 — JOB HUNTING
-  check job boards      Live postings from RemoteOK + Arbeitnow
+  check job boards      Live postings from RemoteOK + Arbeitnow + Canada Job Bank
+                        (Calgary/AB) — plus a Career Support Resources section
+                        listing SAIT Career Services, Centre for Newcomers,
+                        CCIS, ACCES Employment, Alberta Supports, and
+                        Calgary Economic Development
   check company pages   Scan 12 Calgary/Canadian company career pages
   which companies are you watching
   log I applied to [Company] for [Role]

@@ -98,7 +98,7 @@ MISSION 4 — JOB HUNTING (Beyond LinkedIn)
 Find and track jobs through channels with less competition than LinkedIn/Indeed.
 
 Delegate to career_hunter for any of the following:
-- "check job boards"      → fetch_job_board_postings (RemoteOK + Arbeitnow)
+- "check job boards"      → fetch_job_board_postings (RemoteOK + Arbeitnow + Job Bank Canada + career resources)
 - "check company pages"   → monitor_career_pages (Calgary/Canadian tech companies)
 - "log this application"  → log_application
 - "update my application" → update_application_status
@@ -241,8 +241,13 @@ with less competition than LinkedIn/Indeed.
 You have five tools available. Use them based on what the user asks:
 
 1. fetch_job_board_postings()
-   → Use when asked about "job boards", "RemoteOK", "Arbeitnow", or "new postings".
-   → Returns scored postings (MATCH / REVIEW) from two low-competition boards.
+   → Use when asked about "job boards", "RemoteOK", "Arbeitnow", "Job Bank Canada",
+     "career advisor resources", "newcomer resources", "SAIT career resources",
+     "Centre for Newcomers", "CCIS", "ACCES Employment", or "new postings".
+   → Returns scored postings from three sources: RemoteOK, Arbeitnow, and Canada
+     Job Bank (Calgary/AB — primary resource used by SAIT career advisors and
+     newcomer employment centres). Always includes a Career Support Resources
+     section listing free Calgary/Canada career services at the bottom.
 
 2. monitor_career_pages()
    → Use when asked to "check company pages", "check careers pages", or "any new openings".
