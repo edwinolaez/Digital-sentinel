@@ -118,6 +118,19 @@ def _refresh_drafts() -> tuple[gr.Dropdown, str]:
     content = _load_draft(newest) if newest else "No drafts saved yet."
     return gr.Dropdown(choices=files, value=newest), content
 
+
+def _delete_draft(filename: str) -> tuple[gr.Dropdown, str]:
+    if filename:
+        path = os.path.join(_DRAFTS_DIR, filename)
+        try:
+            os.remove(path)
+        except FileNotFoundError:
+            pass
+    files = _draft_files()
+    newest = files[0] if files else None
+    content = _load_draft(newest) if newest else "No drafts saved yet."
+    return gr.Dropdown(choices=files, value=newest), content
+
 # ── CSS ───────────────────────────────────────────────────────────────────────
 
 CSS = """
@@ -352,6 +365,15 @@ body, .gradio-container {
     height: 36px !important;
 }
 #refresh-btn:hover { background: #0d6460 !important; }
+#delete-draft-btn {
+    background: #dc2626 !important;
+    color: #fff !important;
+    border: none !important;
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+    height: 36px !important;
+}
+#delete-draft-btn:hover { background: #b91c1c !important; }
 """
 
 JS_TOGGLE = """
@@ -440,6 +462,7 @@ const DARK_CSS = `
   #drafts-dropdown .item.selected { background: #134e4a !important; color: #f1f5f9 !important; }
   #drafts-content textarea { background: #0f172a !important; color: #f1f5f9 !important; border-color: #134e4a !important; }
   #refresh-btn { background: #0f766e !important; }
+  #delete-draft-btn { background: #dc2626 !important; color: #fff !important; }
   #theme-btn { background: #475569 !important; }
   .message-wrap, .wrap { background: #1e293b !important; }
   ::-webkit-scrollbar-thumb { background: #475569 !important; }
@@ -572,6 +595,12 @@ def build_ui() -> gr.Blocks:
                         scale=1,
                         min_width=80,
                     )
+                    delete_draft_btn = gr.Button(
+                        "Delete",
+                        elem_id="delete-draft-btn",
+                        scale=1,
+                        min_width=80,
+                    )
                 drafts_content = gr.Textbox(
                     value=_load_draft(initial_newest) if initial_newest else "No drafts saved yet.",
                     show_label=False,
@@ -625,6 +654,13 @@ def build_ui() -> gr.Blocks:
         # Refresh: re-scan the folder and pick the newest draft
         refresh_btn.click(
             fn=_refresh_drafts,
+            outputs=[drafts_dropdown, drafts_content],
+        )
+
+        # Delete: remove selected file, reload dropdown to next available draft
+        delete_draft_btn.click(
+            fn=_delete_draft,
+            inputs=[drafts_dropdown],
             outputs=[drafts_dropdown, drafts_content],
         )
 
