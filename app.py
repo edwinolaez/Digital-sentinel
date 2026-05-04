@@ -185,6 +185,26 @@ body, .gradio-container {
     font-size: .84rem !important;
     line-height: 1.55 !important;
 }
+/* Cascade text colour into every child element inside a bot bubble */
+#chatbox .bot *, #chatbox .message.bot *,
+#chatbox [data-testid="bot"] .bubble-wrap *,
+#chatbox .bubble-wrap.bot * {
+    color: #1a202c !important;
+}
+#chatbox .bot a, #chatbox .message.bot a,
+#chatbox [data-testid="bot"] a, #chatbox .bubble-wrap.bot a {
+    color: #2563eb !important;
+}
+#chatbox .bot code, #chatbox .message.bot code,
+#chatbox [data-testid="bot"] code, #chatbox .bubble-wrap.bot code {
+    background: #dde6f5 !important; color: #1e3a5f !important;
+    border-radius: 3px !important; padding: 1px 5px !important;
+}
+#chatbox .bot pre, #chatbox .message.bot pre,
+#chatbox [data-testid="bot"] pre, #chatbox .bubble-wrap.bot pre {
+    background: #dde6f5 !important; border: 1px solid #c7d7f8 !important;
+    border-radius: 6px !important; padding: 8px 12px !important;
+}
 #ds-input-row {
     background: #ffffff !important;
     border: 1px solid #dde3ec !important;
@@ -258,16 +278,63 @@ const DARK_CSS = `
   .qbtn button { background: #253347 !important; color: #60a5fa !important; border-color: #334155 !important; }
   .qbtn button:hover { background: #3b82f6 !important; color: #fff !important; }
   #chatbox, #chatbox > div { background: #1e293b !important; border-color: #334155 !important; }
-  #chatbox .user { background: #2563eb !important; color: #fff !important; }
-  #chatbox .bot  { background: #253347 !important; color: #f1f5f9 !important; }
+
+  /* ── Bot bubble: background + every child element ── */
+  #chatbox .bot, #chatbox .message.bot,
+  #chatbox [data-testid="bot"] .bubble-wrap,
+  #chatbox .bubble-wrap.bot {
+    background: #253347 !important;
+    color: #f1f5f9 !important;
+  }
+  #chatbox .bot *, #chatbox .message.bot *,
+  #chatbox [data-testid="bot"] .bubble-wrap *,
+  #chatbox .bubble-wrap.bot *,
+  #chatbox [data-testid="bot"] p,
+  #chatbox [data-testid="bot"] span,
+  #chatbox [data-testid="bot"] li,
+  #chatbox [data-testid="bot"] strong,
+  #chatbox [data-testid="bot"] em,
+  #chatbox [data-testid="bot"] h1,
+  #chatbox [data-testid="bot"] h2,
+  #chatbox [data-testid="bot"] h3,
+  #chatbox [data-testid="bot"] td,
+  #chatbox [data-testid="bot"] th { color: #f1f5f9 !important; }
+
+  /* ── Links in chat ── */
+  #chatbox a, #chatbox .bot a,
+  #chatbox [data-testid="bot"] a { color: #60a5fa !important; }
+
+  /* ── Inline code in bot bubbles ── */
+  #chatbox .bot code, #chatbox .message.bot code,
+  #chatbox [data-testid="bot"] code, #chatbox .bubble-wrap.bot code {
+    background: #0d1b2e !important;
+    color: #93c5fd !important;
+    border: 1px solid #334155 !important;
+    border-radius: 3px !important;
+    padding: 1px 5px !important;
+  }
+  /* ── Code blocks (pre) in bot bubbles ── */
+  #chatbox .bot pre, #chatbox .message.bot pre,
+  #chatbox [data-testid="bot"] pre, #chatbox .bubble-wrap.bot pre {
+    background: #0d1b2e !important;
+    border: 1px solid #334155 !important;
+    border-radius: 6px !important;
+    padding: 8px 12px !important;
+    color: #e2e8f0 !important;
+  }
+  #chatbox .bot pre *, #chatbox [data-testid="bot"] pre * { color: #e2e8f0 !important; }
+
+  /* ── User bubble stays white ── */
+  #chatbox .user, #chatbox [data-testid="user"] .bubble-wrap { background: #2563eb !important; }
+  #chatbox .user *, #chatbox [data-testid="user"] * { color: #ffffff !important; }
+
   #ds-input-row  { background: #1e293b !important; border-color: #334155 !important; }
   #ds-textbox textarea { background: #0f172a !important; color: #f1f5f9 !important; border-color: #334155 !important; }
   #resume-panel  { background: #1a1f35 !important; border-color: #334155 !important; }
   #resume-panel-label { color: #a78bfa !important; }
   #resume-job-input textarea { background: #0f172a !important; color: #f1f5f9 !important; border-color: #334155 !important; }
   #theme-btn { background: #475569 !important; }
-  .message-wrap, .wrap, .svelte-1ipelgc { background: #1e293b !important; }
-  .prose, p, span, label, .label-wrap { color: #f1f5f9 !important; }
+  .message-wrap, .wrap { background: #1e293b !important; }
   ::-webkit-scrollbar-thumb { background: #475569 !important; }
 `;
 
