@@ -89,6 +89,35 @@ QUICK_COMMANDS = [
 
 RESUME_PROMPT_PREFIX = "tailor my resume for this job: "
 
+_DRAFTS_DIR = os.path.join(os.path.dirname(__file__), "application_drafts")
+
+
+def _draft_files() -> list[str]:
+    if not os.path.isdir(_DRAFTS_DIR):
+        return []
+    return sorted(
+        [f for f in os.listdir(_DRAFTS_DIR) if f.endswith(".txt")],
+        reverse=True,
+    )
+
+
+def _load_draft(filename: str) -> str:
+    if not filename:
+        return ""
+    path = os.path.join(_DRAFTS_DIR, filename)
+    try:
+        with open(path, encoding="utf-8") as f:
+            return f.read()
+    except FileNotFoundError:
+        return f"[File not found: {filename}]"
+
+
+def _refresh_drafts() -> tuple[gr.Dropdown, str]:
+    files = _draft_files()
+    newest = files[0] if files else None
+    content = _load_draft(newest) if newest else "No drafts saved yet."
+    return gr.Dropdown(choices=files, value=newest), content
+
 # ── CSS ───────────────────────────────────────────────────────────────────────
 
 CSS = """
@@ -277,6 +306,40 @@ body, .gradio-container {
     letter-spacing: .03em;
     margin-bottom: 6px;
 }
+#drafts-viewer-panel {
+    background: #f0fdf9;
+    border: 1px solid #99f6e4;
+    border-top: none;
+    padding: 10px 14px 14px;
+    border-radius: 0 0 10px 10px;
+}
+#drafts-viewer-label {
+    font-size: .78rem;
+    font-weight: 600;
+    color: #0f766e;
+    letter-spacing: .03em;
+    margin-bottom: 6px;
+}
+#drafts-dropdown { margin-bottom: 6px; }
+#drafts-dropdown .wrap { border-color: #99f6e4 !important; }
+#drafts-content textarea {
+    background: #ffffff !important;
+    color: #1a202c !important;
+    border: 1px solid #99f6e4 !important;
+    border-radius: 8px !important;
+    font-family: 'Consolas','Courier New',monospace !important;
+    font-size: .82rem !important;
+    line-height: 1.55 !important;
+}
+#refresh-btn {
+    background: #0f766e !important;
+    color: #fff !important;
+    border: none !important;
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+    height: 36px !important;
+}
+#refresh-btn:hover { background: #0d6460 !important; }
 """
 
 JS_TOGGLE = """
@@ -344,6 +407,11 @@ const DARK_CSS = `
   #resume-panel-label { color: #a78bfa !important; }
   #resume-job-input textarea { background: #0f172a !important; color: #f1f5f9 !important; border-color: #334155 !important; }
   #drafts-btn { background: #0f766e !important; color: #fff !important; }
+  #drafts-viewer-panel { background: #0d1f1e !important; border-color: #134e4a !important; }
+  #drafts-viewer-label { color: #2dd4bf !important; }
+  #drafts-dropdown .wrap { border-color: #134e4a !important; background: #0f172a !important; }
+  #drafts-content textarea { background: #0f172a !important; color: #f1f5f9 !important; border-color: #134e4a !important; }
+  #refresh-btn { background: #0f766e !important; }
   #theme-btn { background: #475569 !important; }
   .message-wrap, .wrap { background: #1e293b !important; }
   ::-webkit-scrollbar-thumb { background: #475569 !important; }
@@ -456,6 +524,35 @@ def build_ui() -> gr.Blocks:
                     variant="secondary",
                 )
 
+        # Saved Drafts viewer panel
+        initial_files = _draft_files()
+        initial_newest = initial_files[0] if initial_files else None
+        with gr.Row(elem_id="drafts-viewer-panel"):
+            with gr.Column():
+                gr.HTML('<div id="drafts-viewer-label">Saved Application Drafts</div>')
+                with gr.Row():
+                    drafts_dropdown = gr.Dropdown(
+                        choices=initial_files,
+                        value=initial_newest,
+                        show_label=False,
+                        elem_id="drafts-dropdown",
+                        scale=9,
+                    )
+                    refresh_btn = gr.Button(
+                        "Refresh",
+                        elem_id="refresh-btn",
+                        scale=1,
+                        min_width=80,
+                    )
+                drafts_content = gr.Textbox(
+                    value=_load_draft(initial_newest) if initial_newest else "No drafts saved yet.",
+                    show_label=False,
+                    lines=14,
+                    max_lines=30,
+                    interactive=False,
+                    elem_id="drafts-content",
+                )
+
         # ── Wire events ───────────────────────────────────────────────────────
 
         msg_box.submit(respond, [msg_box, chatbot], [chatbot, msg_box])
@@ -488,6 +585,19 @@ def build_ui() -> gr.Blocks:
             outputs=msg_box,
         ).then(
             respond, [msg_box, chatbot], [chatbot, msg_box]
+        )
+
+        # Drafts viewer: selecting a draft loads its content
+        drafts_dropdown.change(
+            fn=_load_draft,
+            inputs=[drafts_dropdown],
+            outputs=[drafts_content],
+        )
+
+        # Refresh: re-scan the folder and pick the newest draft
+        refresh_btn.click(
+            fn=_refresh_drafts,
+            outputs=[drafts_dropdown, drafts_content],
         )
 
     return demo
