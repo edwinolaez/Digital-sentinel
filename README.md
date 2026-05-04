@@ -14,7 +14,8 @@ Digital Sentinel is a fully local, multi-agent AI assistant that runs on your ma
 | **Clone Guard** | Audits any GitHub repo for red flags before you clone or fork it — returns SAFE / CAUTION / DANGEROUS |
 | **GitHub Trend Intelligence** | Fetches the fastest-rising repos across 8 tech categories, then uses Gemini to synthesise career-relevant learning recommendations |
 | **Job Hunting** | Pulls live postings from RemoteOK + Arbeitnow, monitors 12 Calgary/Canadian company career pages for new listings, tracks every application you log |
-| **Cold Outreach & Resume Coach** | Writes personalised cold emails + LinkedIn messages using your real background; analyses a job posting against your profile and rewrites your bullets to match |
+| **Resume & Cover Letter Generator** | Dedicated dashboard panel — paste a job URL or description, get a full functional resume (Professional Summary → Highlights → Skills → PAR-format Experience bullets → Work History → Education) plus a 3-paragraph cover letter, auto-saved as a draft |
+| **Cold Outreach** | Writes personalised cold emails + LinkedIn messages using your real background; 4-6 sentence max, specific, single ask |
 | **Profile Manager** | Single source of truth for all agents — edit your skills, projects, goals, and preferences through natural conversation |
 
 Every workflow runs a security layer: all job URLs are domain-checked, all posting text is scanned for scam signals, and all GitHub repos can be audited on demand.
@@ -42,6 +43,7 @@ digital-sentinel/
         ├── career_page_monitor.py  ← 12 company career pages (hash comparison)
         ├── application_tracker.py  ← Log + track job applications
         ├── resume_tools.py         ← Job posting fetcher for resume coaching
+        ├── application_drafter.py  ← Save cover letters + resume bullets as local drafts
         ├── profile_manager.py      ← Profile CRUD (7 functions)
         ├── usage_tracker.py        ← Token usage + cost estimation
         └── help_tool.py            ← Command reference card
@@ -64,7 +66,7 @@ root_agent  (LlmAgent — orchestrator)
 ├── outreach_agent (LlmAgent)
 │       └── get_profile()
 ├── resume_coach   (LlmAgent)
-│       └── get_profile() · fetch_job_posting()
+│       └── get_profile() · fetch_job_posting() · save_application_draft() · list_saved_drafts() · create_gmail_draft()
 └── profile_agent  (LlmAgent)
         └── get_profile() · set_profile_field() · add_to_list()
             remove_from_list() · add_project() · update_project()
@@ -161,12 +163,20 @@ MISSION 5 — PROFILE MANAGER
   add a new project
   set my career goal to [goal]
 
-MISSION 6 — COLD OUTREACH & RESUME COACH
-  draft a cold email to a [role] at [Company]
-  draft a LinkedIn message to the hiring manager at [Company]
+MISSION 6 — RESUME & COVER LETTER GENERATOR
+  [Dashboard panel] Paste a job URL or description into the purple
+  "Resume & Cover Letter Generator" panel and click the button.
+  The agent produces a full functional resume + cover letter and
+  saves it to application_drafts/ automatically.
+
   tailor my resume for [URL or paste job description]
   write me a cover letter for this job: [URL or text]
   how do I match up against this posting: [text]
+  show my drafts
+
+MISSION 7 — COLD OUTREACH
+  draft a cold email to a [role] at [Company]
+  draft a LinkedIn message to the hiring manager at [Company]
 ```
 
 ---

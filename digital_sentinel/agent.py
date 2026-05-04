@@ -7,7 +7,8 @@ Requires GOOGLE_GENAI_API_KEY in your .env file.
 """
 from google.adk.agents import LlmAgent, ParallelAgent
 
-from .tools.email_tool import fetch_gmail_emails, fetch_yahoo_emails
+from .tools.email_tool import fetch_gmail_emails, fetch_yahoo_emails, create_gmail_draft
+from .tools.application_drafter import save_application_draft, list_saved_drafts
 from .tools.career_scout import scan_for_job_leads
 from .tools.repo_auditor import audit_github_repo
 from .tools.trend_scout import fetch_github_trending
@@ -270,6 +271,50 @@ You have five tools available. Use them based on what the user asks:
 Present results clearly. For job board postings, highlight MATCH results first.
 For career page changes, explain that a changed page means new postings are likely
 and Edwin should visit the URL directly to see what's new.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+AUTO-DRAFT WORKFLOW (new postings only)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+After surfacing new MATCH postings (BA, Frontend, Backend, or other entry-level),
+automatically generate an application package for each top match — up to 3 per
+run, in priority order (BA first, then Frontend, then Backend).
+
+For each draft:
+1. Call fetch_job_posting(url) to get the posting content.
+2. Call get_profile() to load Edwin's current background.
+3. Using the posting and profile, write:
+   - A COVER LETTER (3 paragraphs, under 250 words):
+       Para 1: Why this company specifically — one concrete detail from the posting.
+       Para 2: Edwin's most relevant project, framed around their problem.
+       Para 3: What he's asking for + confident close.
+   - TAILORED RESUME BULLETS (3–5 bullets rewritten for this specific role,
+     impact-driven, leading with strong verbs, mirroring the posting's language).
+4. Call save_application_draft(job_title, company, cover_letter, tailored_bullets,
+   job_url) to save the package locally.
+5. Show both documents in the chat clearly labelled.
+
+After ALL drafts are shown, present a numbered review menu:
+  "Review the drafts above. When ready:
+   • 'send #1 to [email]' — creates a Gmail draft (nothing sent until you click Send in Gmail)
+   • 'skip #1' — pass on this one
+   • 'show my drafts' — list all saved application packages"
+
+8. create_gmail_draft(to_email, subject, body)
+   → Use when Edwin approves a draft and provides a recipient email.
+   → Creates the draft in Gmail — nothing is sent automatically.
+   → Confirm: "Draft created. Open Gmail > Drafts to review and send."
+
+9. save_application_draft(job_title, company, cover_letter, tailored_bullets, job_url)
+   → Use after generating every application package.
+   → Always save before presenting for review.
+
+10. list_saved_drafts()
+    → Use when asked "show my drafts" or "what applications have I drafted".
+    → Lists all saved packages in application_drafts/.
+
+IMPORTANT: Never send anything automatically. Always save first, show for review,
+and only create a Gmail draft when Edwin explicitly approves.
 """
 
 # ── Outreach agent instruction ────────────────────────────────────────────────
@@ -390,12 +435,66 @@ Then produce a report with these sections in order:
    - Specific tools he hasn't used
    - Suggest how to frame these honestly and confidently
 
-8. COVER LETTER (only if requested, or if the user asks)
+8. FULL RESUME OUTPUT (generated for every analysis — do not wait to be asked)
+   Follow this exact functional/skill-based resume format:
+
+   ───────────────────────────────────────
+   [Edwin's Name]
+   [Address] | [Phone] | [Email] | [LinkedIn]
+   [Job Title being applied for]
+
+   PROFESSIONAL SUMMARY
+   2–3 sentences aligning Edwin's career brand with this role. Highlight the most
+   relevant skills, experiences, and accomplishments concisely.
+
+   HIGHLIGHTS OF QUALIFICATIONS
+   6–10 bullets that closely match qualifications in the job posting:
+   • Years of related education (SAIT Software Development, graduating Aug 2026)
+   • Key technical skills from his stack that match the posting
+   • Key soft skills and attributes from the posting
+   • Notable academic or project achievements
+
+   SKILLS
+   Pipe-separated list of all skills/competencies required by the posting that Edwin has:
+   e.g.  React | TypeScript | Python | REST APIs | Problem-solving | Attention to Detail
+
+   RELEVANT EXPERIENCE (skill-based sections, NOT chronological)
+   Group bullets under skill headings that match the job posting requirements.
+   For each bullet: start with an action verb, lead with results, use PAR format
+   (Problem, Action, Result) where possible. Draw from Edwin's real projects.
+   Example heading: "Frontend Development Skills"
+     • Built a Next.js/React dashboard that reduced monitoring setup time by 60%...
+
+   WORK HISTORY
+   [Job Title] | [Company] | [City, Province] | [Month Year – Month Year]
+   (List roles Edwin has held, newest first. Pull from profile work history.)
+
+   EDUCATION
+   Diploma in Software Development                                    2026
+   Southern Alberta Institute of Technology (SAIT), Calgary, AB
+
+   PROFESSIONAL AFFILIATIONS
+   (List only if relevant; omit section if empty.)
+
+   INTERESTS (optional — include only if relevant to this role)
+   ───────────────────────────────────────
+
+   After the full resume, output:
+
+   COVER LETTER
    3-paragraph structure:
-   - Para 1: Why this company specifically (one concrete detail)
-   - Para 2: The most relevant project, framed around their problem
-   - Para 3: What you're asking for + confident close
+   - Para 1: Why this company specifically (one concrete detail from the posting)
+   - Para 2: Edwin's most relevant project, framed around their problem
+   - Para 3: What he's asking for + confident close
    Keep it under 250 words. No fluff.
+
+   After generating both documents, ALWAYS:
+   a) Call save_application_draft(job_title, company, cover_letter, tailored_bullets, job_url)
+      where tailored_bullets contains the full resume text above.
+   b) Show the saved confirmation, then ask:
+      "Review the resume and cover letter above. When ready:
+       • 'send to [email]' — I'll create a Gmail draft (nothing sent until you click Send in Gmail)
+       • 'show my drafts' — see all saved application packages"
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 TONE RULES
@@ -481,6 +580,11 @@ career_hunter = LlmAgent(
         update_application_status,
         get_applications,
         flag_stale_applications,
+        fetch_job_posting,
+        get_profile,
+        save_application_draft,
+        list_saved_drafts,
+        create_gmail_draft,
     ],
 )
 
@@ -512,7 +616,7 @@ resume_coach = LlmAgent(
         "cover letter. Always reads the current profile before analyzing."
     ),
     instruction=_RESUME_COACH_INSTRUCTION,
-    tools=[get_profile, fetch_job_posting],
+    tools=[get_profile, fetch_job_posting, save_application_draft, list_saved_drafts, create_gmail_draft],
 )
 
 # ── Profile Agent ─────────────────────────────────────────────────────────────

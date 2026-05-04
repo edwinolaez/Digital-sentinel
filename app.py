@@ -87,6 +87,8 @@ QUICK_COMMANDS = [
     ("Audit Repo",    "audit "),
 ]
 
+RESUME_PROMPT_PREFIX = "tailor my resume for this job: "
+
 # ── CSS ───────────────────────────────────────────────────────────────────────
 
 CSS = """
@@ -212,6 +214,39 @@ body, .gradio-container {
 #ds-send:hover { background: #2563eb !important; }
 ::-webkit-scrollbar { width:5px; }
 ::-webkit-scrollbar-thumb { background: #dde3ec; border-radius:3px; }
+#resume-panel {
+    background: #f0f4ff;
+    border: 1px solid #c7d7f8;
+    border-top: none;
+    border-radius: 0;
+    padding: 10px 14px;
+}
+#resume-panel .label-wrap { display:none !important; }
+#resume-job-input textarea {
+    background: #ffffff !important;
+    color: #1a202c !important;
+    border: 1px solid #c7d7f8 !important;
+    border-radius: 8px !important;
+    padding: 9px 12px !important;
+    font-size: .88rem !important;
+}
+#resume-job-input textarea:focus { border-color: #3b82f6 !important; outline: none !important; }
+#resume-gen-btn {
+    background: #7c3aed !important;
+    color: #fff !important;
+    border: none !important;
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+    height: 42px !important;
+}
+#resume-gen-btn:hover { background: #6d28d9 !important; }
+#resume-panel-label {
+    font-size: .78rem;
+    font-weight: 600;
+    color: #7c3aed;
+    letter-spacing: .03em;
+    margin-bottom: 6px;
+}
 """
 
 JS_TOGGLE = """
@@ -227,6 +262,9 @@ const DARK_CSS = `
   #chatbox .bot  { background: #253347 !important; color: #f1f5f9 !important; }
   #ds-input-row  { background: #1e293b !important; border-color: #334155 !important; }
   #ds-textbox textarea { background: #0f172a !important; color: #f1f5f9 !important; border-color: #334155 !important; }
+  #resume-panel  { background: #1a1f35 !important; border-color: #334155 !important; }
+  #resume-panel-label { color: #a78bfa !important; }
+  #resume-job-input textarea { background: #0f172a !important; color: #f1f5f9 !important; border-color: #334155 !important; }
   #theme-btn { background: #475569 !important; }
   .message-wrap, .wrap, .svelte-1ipelgc { background: #1e293b !important; }
   .prose, p, span, label, .label-wrap { color: #f1f5f9 !important; }
@@ -317,6 +355,24 @@ def build_ui() -> gr.Blocks:
             )
             send_btn = gr.Button("Send", elem_id="ds-send", scale=1, variant="primary")
 
+        # Resume & Cover Letter panel
+        with gr.Row(elem_id="resume-panel"):
+            with gr.Column(scale=9):
+                gr.HTML('<div id="resume-panel-label">Resume &amp; Cover Letter Generator — paste a job URL or description below</div>')
+                resume_job_input = gr.Textbox(
+                    placeholder="https://example.com/job/123  — or paste the full job description here",
+                    show_label=False,
+                    lines=2,
+                    max_lines=8,
+                    elem_id="resume-job-input",
+                )
+            with gr.Column(scale=1, min_width=190):
+                resume_gen_btn = gr.Button(
+                    "Generate Resume & Cover Letter",
+                    elem_id="resume-gen-btn",
+                    variant="primary",
+                )
+
         # ── Wire events ───────────────────────────────────────────────────────
 
         msg_box.submit(respond, [msg_box, chatbot], [chatbot, msg_box])
@@ -327,6 +383,22 @@ def build_ui() -> gr.Blocks:
             btn.click(fn=lambda c=cmd: c, outputs=msg_box).then(
                 respond, [msg_box, chatbot], [chatbot, msg_box]
             )
+
+        # Resume generator button: build prompt from job input, send to agent
+        def _build_resume_prompt(job_text: str) -> tuple[str, str]:
+            job_text = job_text.strip()
+            if not job_text:
+                return "", ""
+            prompt = f"{RESUME_PROMPT_PREFIX}{job_text}"
+            return prompt, ""
+
+        resume_gen_btn.click(
+            fn=_build_resume_prompt,
+            inputs=[resume_job_input],
+            outputs=[msg_box, resume_job_input],
+        ).then(
+            respond, [msg_box, chatbot], [chatbot, msg_box]
+        )
 
     return demo
 
