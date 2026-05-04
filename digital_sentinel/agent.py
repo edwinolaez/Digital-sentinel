@@ -288,15 +288,54 @@ run, in priority order (BA first, then Frontend, then Backend).
 For each draft:
 1. Call fetch_job_posting(url) to get the posting content.
 2. Call get_profile() to load Edwin's current background.
-3. Using the posting and profile, write:
-   - A COVER LETTER (3 paragraphs, under 250 words):
-       Para 1: Why this company specifically — one concrete detail from the posting.
-       Para 2: Edwin's most relevant project, framed around their problem.
-       Para 3: What he's asking for + confident close.
-   - TAILORED RESUME BULLETS (3–5 bullets rewritten for this specific role,
-     impact-driven, leading with strong verbs, mirroring the posting's language).
-4. Call save_application_draft(job_title, company, cover_letter, tailored_bullets,
-   job_url) to save the package locally.
+3. Using the posting and profile, produce TWO documents:
+
+   DOCUMENT 1 — FULL RESUME (functional/skill-based format):
+   ───────────────────────────────────────
+   [Edwin's Name]
+   [Address] | [Phone] | [Email] | [LinkedIn]
+   [Job Title being applied for]
+
+   PROFESSIONAL SUMMARY
+   2–3 sentences aligning Edwin's career brand with this role.
+
+   HIGHLIGHTS OF QUALIFICATIONS
+   6–10 bullets closely matching the posting:
+   • Years of related education (SAIT Software Development, graduating Aug 2026)
+   • Key technical skills from his stack that match
+   • Key soft skills from the posting
+   • Notable project achievements
+
+   SKILLS
+   Pipe-separated: React | TypeScript | Python | Node.js | ... (match the posting)
+
+   RELEVANT EXPERIENCE (skill-based, NOT chronological)
+   Group PAR-format bullets under skill headings matching the posting.
+   Lead with action verbs, include results. Draw from Edwin's real projects.
+   Example heading: "Frontend Development Skills"
+     • Built a Next.js/React dashboard that reduced monitoring setup time by 60%...
+
+   WORK HISTORY
+   [Job Title] | [Company] | [City, Province] | [Month Year – Month Year]
+
+   EDUCATION
+   Diploma in Software Development                                    2026
+   Southern Alberta Institute of Technology (SAIT), Calgary, AB
+   ───────────────────────────────────────
+
+   DOCUMENT 2 — COVER LETTER (3 paragraphs, under 250 words):
+   Para 1: Why this company specifically — one concrete detail from the posting.
+   Para 2: Edwin's most relevant project, framed around their problem.
+   Para 3: What he's asking for + confident close.
+
+4. Call save_application_draft(
+       job_title=<role>,
+       company=<company>,
+       cover_letter=<the cover letter>,
+       resume_content=<THE COMPLETE RESUME — all sections as written above.
+           Do NOT abbreviate or replace with a bullet list. Paste the full text.>,
+       job_url=<url>
+   ) to save the package locally.
 5. Show both documents in the chat clearly labelled.
 
 After ALL drafts are shown, present a numbered review menu:
@@ -494,8 +533,15 @@ Then produce a report with these sections in order:
    Keep it under 250 words. No fluff.
 
    After generating both documents, ALWAYS:
-   a) Call save_application_draft(job_title, company, cover_letter, tailored_bullets, job_url)
-      where tailored_bullets contains the full resume text above.
+   a) Call save_application_draft(
+          job_title=<role>,
+          company=<company>,
+          cover_letter=<the 3-paragraph cover letter>,
+          resume_content=<THE COMPLETE RESUME — every section from Professional
+              Summary through Education, exactly as written above. Do NOT
+              abbreviate, summarise, or replace with bullets. Paste the full text.>,
+          job_url=<url>
+      )
    b) Show the saved confirmation, then ask:
       "Review the resume and cover letter above. When ready:
        • 'send to [email]' — I'll create a Gmail draft (nothing sent until you click Send in Gmail)

@@ -1,6 +1,6 @@
 """
 Digital Sentinel — Application Drafter
-Saves cover letters and tailored resume bullets as local draft files.
+Saves full application packages (complete resume + cover letter) as local draft files.
 Drafts land in application_drafts/ at the project root for review before sending.
 """
 import os
@@ -20,21 +20,28 @@ def save_application_draft(
     job_title: str,
     company: str,
     cover_letter: str,
-    tailored_bullets: str,
+    resume_content: str,
     job_url: str = "",
     notes: str = "",
 ) -> str:
-    """Saves a complete application package (cover letter + resume bullets) to a local file.
+    """Saves a complete application package (full resume + cover letter) to a local file.
 
-    Call this immediately after generating an application package so Edwin can
-    review it before anything is sent. Files are saved to application_drafts/
-    named by date, company, and role.
+    Call this immediately after generating the full resume and cover letter so
+    Edwin can review the complete package before anything is sent. Files are
+    saved to application_drafts/ named by date, company, and role.
+
+    IMPORTANT: resume_content must contain the COMPLETE formatted resume, not
+    just bullet points. It should include every section of the functional
+    resume template: Professional Summary, Highlights of Qualifications,
+    Skills, Relevant Experience (PAR-format bullets grouped by skill heading),
+    Work History, and Education. Do NOT abbreviate — paste the full resume.
 
     Args:
         job_title: Job title / role name.
         company: Company name.
-        cover_letter: Full cover letter text generated for this posting.
-        tailored_bullets: Tailored resume bullet points for this role.
+        cover_letter: Full cover letter text (3 paragraphs, under 250 words).
+        resume_content: The COMPLETE formatted resume — all sections from
+            Professional Summary through Education. Not just bullets.
         job_url: Original job posting URL (optional).
         notes: Any additional context notes (optional).
 
@@ -60,13 +67,13 @@ Date     : {date_str}
 URL      : {job_url or 'N/A'}
 {sep}
 
+FULL RESUME
+{'-' * 60}
+{resume_content.strip()}
+
 COVER LETTER
 {'-' * 60}
 {cover_letter.strip()}
-
-TAILORED RESUME BULLETS
-{'-' * 60}
-{tailored_bullets.strip()}
 """
     if notes:
         content += f"\nNOTES\n{'-' * 60}\n{notes.strip()}\n"
@@ -77,7 +84,7 @@ TAILORED RESUME BULLETS
 
     return (
         f"Draft saved: application_drafts/{filename}\n"
-        f"Review the cover letter and bullets above.\n"
+        f"Review the full resume and cover letter above.\n"
         f"When ready, say:\n"
         f"  'create gmail draft for {company}' — opens a ready-to-send Gmail draft\n"
         f"  'skip {company}' — pass on this one\n"
