@@ -46,11 +46,21 @@ _BACKEND_RE = re.compile(
     re.IGNORECASE,
 )
 
+_AI_ML_RE = re.compile(
+    r"\b(machine learning|ml engineer|ai engineer|ai developer|"
+    r"data scientist|data engineer|nlp|natural language processing|"
+    r"computer vision|deep learning|neural network|llm|large language model|"
+    r"generative ai|gen ai|artificial intelligence|mlops|ml ops|"
+    r"ai analyst|ai researcher|ai specialist)\b",
+    re.IGNORECASE,
+)
+
 _TECH_RE = re.compile(
     r"\b(python|react|typescript|javascript|next\.?js|node\.?js|"
     r"fullstack|full.stack|full stack|frontend|front.end|backend|back.end|"
     r"software developer|software engineer|web developer|"
-    r"flask|fastapi|django|rest api|sql|mongodb|business analyst|analyst)\b",
+    r"flask|fastapi|django|rest api|sql|mongodb|business analyst|analyst|"
+    r"machine learning|data scientist|ai engineer|artificial intelligence)\b",
     re.IGNORECASE,
 )
 
@@ -59,6 +69,8 @@ _JOB_BANK_SEARCHES = [
     {"searchstring": "software developer", "locationstring": "Calgary", "fprov": "AB"},
     {"searchstring": "web developer",      "locationstring": "Calgary", "fprov": "AB"},
     {"searchstring": "business analyst",   "locationstring": "Calgary", "fprov": "AB"},
+    {"searchstring": "machine learning",   "locationstring": "Calgary", "fprov": "AB"},
+    {"searchstring": "data scientist",     "locationstring": "Calgary", "fprov": "AB"},
 ]
 
 # Eluta.ca — Canadian job aggregator, Calgary-focused searches
@@ -68,6 +80,9 @@ _ELUTA_SEARCHES = [
     {"q": "junior developer",        "l": "Calgary, AB"},
     {"q": "business analyst",        "l": "Calgary, AB"},
     {"q": "junior business analyst", "l": "Calgary, AB"},
+    {"q": "machine learning",        "l": "Calgary, AB"},
+    {"q": "data scientist",          "l": "Calgary, AB"},
+    {"q": "AI developer",            "l": "Calgary, AB"},
 ]
 
 # Browser User-Agent — Eluta.ca requires it for search pages
@@ -99,11 +114,12 @@ centres, and immigrant employment programs to help job seekers find roles.
   Calgary Economic Development  https://calgaryeconomicdevelopment.com
 """
 
-# Priority order: BA → FRONTEND → BACKEND → MATCH (other entry-level) → REVIEW
-_PRIORITY_ORDER = ["BA", "FRONTEND", "BACKEND", "MATCH", "REVIEW"]
+# Priority order: BA → AI/ML → FRONTEND → BACKEND → MATCH → REVIEW
+_PRIORITY_ORDER = ["BA", "AI", "FRONTEND", "BACKEND", "MATCH", "REVIEW"]
 
 _PRIORITY_LABELS = {
     "BA":       "Business Analyst",
+    "AI":       "AI / Machine Learning",
     "FRONTEND": "Frontend",
     "BACKEND":  "Backend",
     "MATCH":    "Other Entry-Level Software Dev",
@@ -117,6 +133,7 @@ def _score(text: str) -> str | None:
 
     has_level = bool(_LEVEL_RE.search(text))
     is_ba       = bool(_BA_RE.search(text))
+    is_ai       = bool(_AI_ML_RE.search(text))
     is_frontend = bool(_FRONTEND_RE.search(text))
     is_backend  = bool(_BACKEND_RE.search(text))
     has_tech    = bool(_TECH_RE.search(text))
@@ -124,13 +141,15 @@ def _score(text: str) -> str | None:
     if has_level:
         if is_ba:
             return "BA"
+        if is_ai:
+            return "AI"
         if is_frontend:
             return "FRONTEND"
         if is_backend:
             return "BACKEND"
         if has_tech:
             return "MATCH"
-    elif is_ba or is_frontend or is_backend or has_tech:
+    elif is_ba or is_ai or is_frontend or is_backend or has_tech:
         return "REVIEW"
     return None
 
@@ -397,9 +416,10 @@ def fetch_job_board_postings(max_results: int = 60) -> str:
 
     totals = {p: len(buckets[p]) for p in _PRIORITY_ORDER}
     report += (
-        f"\nSummary: {totals['BA']} BA · {totals['FRONTEND']} Frontend · "
-        f"{totals['BACKEND']} Backend · {totals['MATCH']} other entry-level · "
-        f"{totals['REVIEW']} to review — sourced from RemoteOK, Arbeitnow, Job Bank Canada, and Eluta.ca.\n"
+        f"\nSummary: {totals['BA']} BA · {totals['AI']} AI/ML · "
+        f"{totals['FRONTEND']} Frontend · {totals['BACKEND']} Backend · "
+        f"{totals['MATCH']} other entry-level · {totals['REVIEW']} to review "
+        f"— sourced from RemoteOK, Arbeitnow, Job Bank Canada, and Eluta.ca.\n"
     )
     report += f"{sep}\n"
     report += f"\n{_CAREER_SUPPORT_RESOURCES}"
