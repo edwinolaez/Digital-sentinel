@@ -54,17 +54,20 @@ _TECH_RE = re.compile(
     re.IGNORECASE,
 )
 
-# Job Bank Canada RSS — two complementary searches to widen the net
+# Job Bank Canada RSS — complementary searches to widen the net
 _JOB_BANK_SEARCHES = [
     {"searchstring": "software developer", "locationstring": "Calgary", "fprov": "AB"},
     {"searchstring": "web developer",      "locationstring": "Calgary", "fprov": "AB"},
+    {"searchstring": "business analyst",   "locationstring": "Calgary", "fprov": "AB"},
 ]
 
 # Eluta.ca — Canadian job aggregator, Calgary-focused searches
 _ELUTA_SEARCHES = [
-    {"q": "software developer", "l": "Calgary, AB"},
-    {"q": "web developer",      "l": "Calgary, AB"},
-    {"q": "junior developer",   "l": "Calgary, AB"},
+    {"q": "software developer",      "l": "Calgary, AB"},
+    {"q": "web developer",           "l": "Calgary, AB"},
+    {"q": "junior developer",        "l": "Calgary, AB"},
+    {"q": "business analyst",        "l": "Calgary, AB"},
+    {"q": "junior business analyst", "l": "Calgary, AB"},
 ]
 
 # Browser User-Agent — Eluta.ca requires it for search pages
