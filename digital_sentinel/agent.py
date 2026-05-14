@@ -23,6 +23,12 @@ from .tools.job_board_scout import fetch_job_board_postings
 from .tools.resume_tools import fetch_job_posting
 from .tools.help_tool import get_help
 from .tools.usage_tracker import record_usage, get_usage_report
+from .tools.url_healer import (
+    get_broken_career_urls,
+    find_career_page,
+    update_career_page_url,
+    list_url_overrides,
+)
 from .tools.profile_manager import (
     get_profile,
     set_profile_field,
@@ -97,13 +103,22 @@ MISSION 4 — JOB HUNTING (Beyond LinkedIn)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Find and track jobs through channels with less competition than LinkedIn/Indeed.
 
+Delegate to career_page_patrol for any of the following:
+- "check company pages" / "any new openings" / "patrol career pages"
+- "fix broken urls" / "heal career pages" / "find [company] career page"
+- "show monitored companies" / "show url overrides"
+career_page_patrol monitors all Calgary tech company career pages AND automatically
+fixes broken URLs in one pass — no follow-up needed.
+
 Delegate to career_hunter for any of the following:
 - "check job boards"      → fetch_job_board_postings (RemoteOK + Arbeitnow + Job Bank Canada + career resources)
-- "check company pages"   → monitor_career_pages (Calgary/Canadian tech companies)
 - "log this application"  → log_application
 - "update my application" → update_application_status
 - "show my applications"  → get_applications
 - "any follow-ups needed" → flag_stale_applications
+
+Delegate to url_healer (standalone) only when the user wants to fix a single
+specific company URL without running a full monitor scan.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 MISSION 5 — COLD OUTREACH
@@ -153,9 +168,10 @@ DAILY BRIEF MODE
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 When the user asks for a "daily brief" or "morning briefing":
 1. email_fan_out → career scout report
-2. career_hunter → job board postings + career page changes + stale follow-ups
-3. trend_analyst → top 3 emerging trends
-4. Combine into one concise report.
+2. career_hunter → job board postings + stale follow-ups
+3. career_page_patrol → company career page changes + auto-heal any broken URLs
+4. trend_analyst → top 3 emerging trends
+5. Combine into one concise report.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 GENERAL RULES
@@ -741,6 +757,164 @@ profile_agent = LlmAgent(
     ],
 )
 
+# ── Career Page Patrol ────────────────────────────────────────────────────────
+
+_PATROL_INSTRUCTION = """
+You are the Career Page Patrol — an autonomous monitor and self-healer for
+Digital Sentinel's list of Calgary tech company career pages.
+
+Every time you are invoked you MUST run the full workflow below from start to
+finish without waiting for further instructions from the user.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 1 — MONITOR
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Call monitor_career_pages().
+Save the full report — you will include it at the end.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 2 — HEAL BROKEN URLs (automatic, no user input required)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Call get_broken_career_urls().
+
+If there are broken URLs:
+  For EACH broken company, call find_career_page(company_name, broken_url).
+    - If a working URL is found → immediately call
+      update_career_page_url(company_name, new_url) to save the fix.
+    - If nothing is found → note it as UNRESOLVED.
+  Do this for every broken company before moving to Step 3.
+
+If there are no broken URLs, skip this step.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 3 — REPORT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Produce one combined report in this order:
+
+  1. The full monitor_career_pages() output (changed pages, unchanged, errors).
+  2. URL HEALING SUMMARY section (only if Step 2 ran):
+       FIXED   : [company] → [new URL]   (for each auto-corrected URL)
+       UNFIXED : [company] — suggest: search "[company] careers" manually,
+                 then say "update [company] url to [url]" to save it.
+  3. If all errors were fixed: "All broken URLs have been corrected. Rerun to
+     verify the newly saved URLs load correctly."
+  4. If some remain unfixed: list them clearly so Edwin can resolve them manually.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ADDITIONAL COMMANDS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+"show monitored companies" / "company list"
+  → Call list_monitored_companies() and return verbatim.
+
+"show url overrides" / "what's been fixed"
+  → Call list_url_overrides() and return verbatim.
+
+"update [company] url to [url]" / "[company] careers is at [url]"
+  → Call update_career_page_url(company_name, new_url) directly.
+
+IMPORTANT:
+- Never skip the auto-heal step when there are broken URLs.
+- Never ask the user "should I fix these?" — just fix them.
+- Never invent or guess URLs — only save URLs confirmed live by
+  find_career_page() or explicitly provided by the user.
+"""
+
+career_page_patrol = LlmAgent(
+    name="career_page_patrol",
+    model="gemini-2.5-flash",
+    after_model_callback=_track_usage,
+    description=(
+        "Autonomous career page monitor + URL self-healer. Runs monitor_career_pages() "
+        "then automatically probes and fixes any broken URLs — no user input needed. "
+        "Use for: 'check company pages', 'patrol career pages', 'any new job openings', "
+        "'fix broken urls', 'heal career pages', 'show monitored companies'."
+    ),
+    instruction=_PATROL_INSTRUCTION,
+    tools=[
+        monitor_career_pages,
+        list_monitored_companies,
+        get_broken_career_urls,
+        find_career_page,
+        update_career_page_url,
+        list_url_overrides,
+    ],
+)
+
+# ── URL Healer ────────────────────────────────────────────────────────────────
+
+_URL_HEALER_INSTRUCTION = """
+You are the URL Healer module of Digital Sentinel.
+
+Your job is to automatically find and fix broken career page URLs that the
+career page monitor could not load, then save the corrections so future scans
+work without any code changes.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WORKFLOW — run this in order every time:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Call get_broken_career_urls() to get the list of companies with fetch errors.
+   If the result says "no broken URLs", report success and stop.
+
+2. For each broken company, call find_career_page(company_name, broken_url).
+   This probes 15+ common URL patterns and 6 job board platforms using fast
+   HEAD requests, so it's quick even for many companies.
+
+3. For every URL that find_career_page() resolves:
+   - Call update_career_page_url(company_name, new_url) to save the fix.
+   - Corrections are stored in career_url_overrides.json and applied automatically
+     on the next career page scan — no source code changes needed.
+
+4. Report clearly:
+   - FIXED: [company] → [new URL]
+   - NOT FOUND: [company] — suggest the user manually search "[company] careers"
+     and then provide the correct URL
+   - Already OK: (if no broken URLs)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ADDITIONAL COMMANDS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+- "show url overrides" / "what urls have been fixed"
+  → Call list_url_overrides() and return the result.
+
+- "fix [company name]" / "find [company name] career page"
+  → Retrieve the broken URL from the snapshot (via get_broken_career_urls) or
+    ask the user for the current URL, then call find_career_page() directly.
+
+- "[company name] careers is at [url]" / "update [company] url to [url]"
+  → Call update_career_page_url(company_name, new_url) directly — no probing needed.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+IMPORTANT RULES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- Never guess or invent URLs — only save URLs that find_career_page() confirmed
+  as live, or that the user explicitly provided.
+- For companies find_career_page() cannot resolve, always suggest the manual
+  search phrase: "[Company Name] careers" or "[Company Name] jobs Calgary".
+- Keep output concise: one line per company, grouped by FIXED / NOT FOUND.
+"""
+
+url_healer = LlmAgent(
+    name="url_healer",
+    model="gemini-2.5-flash",
+    after_model_callback=_track_usage,
+    description=(
+        "Automatically finds and fixes broken career page URLs detected by the "
+        "career page monitor. Probes 15+ common URL patterns and 6 job board "
+        "platforms (Lever, Greenhouse, Workable, …) per company, then saves "
+        "corrections to an override file so future scans work without code changes. "
+        "Trigger with: 'fix broken urls', 'heal career pages', or 'find [company] career page'."
+    ),
+    instruction=_URL_HEALER_INSTRUCTION,
+    tools=[
+        get_broken_career_urls,
+        find_career_page,
+        update_career_page_url,
+        list_url_overrides,
+    ],
+)
+
 # ── Root orchestrator ─────────────────────────────────────────────────────────
 
 root_agent = LlmAgent(
@@ -761,8 +935,10 @@ root_agent = LlmAgent(
         email_fan_out,
         trend_analyst,
         career_hunter,
+        career_page_patrol,
         outreach_agent,
         resume_coach,
         profile_agent,
+        url_healer,
     ],
 )

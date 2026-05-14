@@ -20,6 +20,13 @@ _LEVEL_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Explicitly senior / leadership roles — excluded from all results
+_SENIOR_RE = re.compile(
+    r"\b(senior|sr\.|lead|principal|staff|architect|manager|director|"
+    r"head of|vp |vice president|cto|cso|chief)\b",
+    re.IGNORECASE,
+)
+
 _BA_RE = re.compile(
     r"\b(business analyst|business analysis|systems analyst|data analyst|"
     r"requirements analyst|product analyst|operations analyst|"
@@ -83,6 +90,9 @@ _PRIORITY_LABELS = {
 
 
 def _score(text: str) -> str | None:
+    if _SENIOR_RE.search(text):
+        return None  # Drop senior / lead / manager roles entirely
+
     has_level = bool(_LEVEL_RE.search(text))
     is_ba       = bool(_BA_RE.search(text))
     is_frontend = bool(_FRONTEND_RE.search(text))

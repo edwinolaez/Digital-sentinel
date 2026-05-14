@@ -6,15 +6,16 @@
 
 ## What It Does
 
-Digital Sentinel is a fully local, multi-agent AI assistant that runs on your machine and handles the routine grind of a job search — securely. It combines six missions into one conversational interface:
+Digital Sentinel is a fully local, multi-agent AI assistant that runs on your machine and handles the routine grind of a job search — securely. It combines eight missions into one conversational interface:
 
 | Mission | What it does |
 |---------|-------------|
 | **Email & Career Scout** | Sweeps Gmail + Yahoo simultaneously for job leads, filters for entry-level software roles, flags phishing/scam subjects automatically |
 | **Clone Guard** | Audits any GitHub repo for red flags before you clone or fork it — returns SAFE / CAUTION / DANGEROUS |
 | **GitHub Trend Intelligence** | Fetches the fastest-rising repos across 8 tech categories, then uses Gemini to synthesise career-relevant learning recommendations |
-| **Job Hunting** | Pulls live postings from RemoteOK + Arbeitnow + **Canada Job Bank** (Calgary/AB — primary resource used by SAIT career advisors, Centre for Newcomers, CCIS, and ACCES Employment); monitors 12 Calgary company career pages; tracks every application you log. Always surfaces a Career Support Resources section with links to free Calgary/Canada career services |
-| **Resume & Cover Letter Generator** | Dedicated dashboard panel — paste a job URL or description, get a full functional resume (Professional Summary → Highlights → Skills → PAR-format Experience bullets → Work History → Education) plus a 3-paragraph cover letter, auto-saved as a draft |
+| **Job Hunting** | Pulls live postings from RemoteOK + Arbeitnow + **Canada Job Bank** (Calgary/AB — primary resource used by SAIT career advisors, Centre for Newcomers, CCIS, and ACCES Employment); monitors **58 Calgary company career pages**; tracks every application you log. Senior/lead/manager roles filtered out automatically — only entry-level and junior postings surface |
+| **Career Page Patrol** | Autonomous agent: monitors all 58 company pages, then automatically probes and fixes any broken URLs in the same run — no user input required |
+| **Resume & Cover Letter Generator** | Paste a job URL or description, get a full functional resume (Professional Summary → Highlights → Skills → PAR-format Experience → Work History → Education) plus a 3-paragraph cover letter, auto-saved as a draft |
 | **Cold Outreach** | Writes personalised cold emails + LinkedIn messages using your real background; 4-6 sentence max, specific, single ask |
 | **Profile Manager** | Single source of truth for all agents — edit your skills, projects, goals, and preferences through natural conversation |
 
@@ -30,20 +31,22 @@ digital-sentinel/
 ├── launch.bat                      ← Terminal launcher (dev use)
 ├── launch.vbs                      ← Silent launcher for desktop shortcut
 ├── profile.json                    ← Your profile (auto-created, git-ignored)
+├── career_url_overrides.json       ← URL corrections (auto-generated, git-ignored)
 ├── safety_auditor.py               ← Standalone repo auditor
 └── digital_sentinel/
-    ├── agent.py                    ← All 7 agents defined here
+    ├── agent.py                    ← All 10 agents defined here
     └── tools/
         ├── email_tool.py           ← Gmail (OAuth) · Yahoo (IMAP/SSL)
         ├── career_scout.py         ← Job filter + phishing detector on emails
         ├── trend_scout.py          ← GitHub trending repo fetcher (8 categories)
         ├── repo_auditor.py         ← ADK wrapper for Clone Guard
         ├── scam_detector.py        ← URL safety + scam content scanner
-        ├── job_board_scout.py      ← RemoteOK + Arbeitnow live postings
-        ├── career_page_monitor.py  ← 12 company career pages (hash comparison)
+        ├── job_board_scout.py      ← RemoteOK + Arbeitnow (entry-level only)
+        ├── career_page_monitor.py  ← 58 company career pages (hash comparison)
+        ├── url_healer.py           ← Broken URL prober + override saver
         ├── application_tracker.py  ← Log + track job applications
         ├── resume_tools.py         ← Job posting fetcher for resume coaching
-        ├── application_drafter.py  ← Save cover letters + resume bullets as local drafts
+        ├── application_drafter.py  ← Save cover letters + resumes as local drafts
         ├── profile_manager.py      ← Profile CRUD (7 functions)
         ├── usage_tracker.py        ← Token usage + cost estimation
         └── help_tool.py            ← Command reference card
@@ -59,14 +62,22 @@ root_agent  (LlmAgent — orchestrator)
 ├── trend_analyst  (LlmAgent)
 │       └── fetch_github_trending() · audit_github_repo()
 ├── career_hunter  (LlmAgent)
-│       └── scout_job_boards() · monitor_career_pages()
-│           log_application() · update_application_status()
-│           get_applications() · flag_stale_applications()
-│           check_url_safety() · scan_for_scam_signals()
+│       └── fetch_job_board_postings() · log_application()
+│           update_application_status() · get_applications()
+│           flag_stale_applications() · fetch_job_posting()
+│           get_profile() · save_application_draft() · create_gmail_draft()
+├── career_page_patrol  (LlmAgent)          ← autonomous monitor + URL healer
+│       └── monitor_career_pages() · list_monitored_companies()
+│           get_broken_career_urls() · find_career_page()
+│           update_career_page_url() · list_url_overrides()
+├── url_healer  (LlmAgent)                  ← targeted single-company URL fixer
+│       └── get_broken_career_urls() · find_career_page()
+│           update_career_page_url() · list_url_overrides()
 ├── outreach_agent (LlmAgent)
 │       └── get_profile()
 ├── resume_coach   (LlmAgent)
-│       └── get_profile() · fetch_job_posting() · save_application_draft() · list_saved_drafts() · create_gmail_draft()
+│       └── get_profile() · fetch_job_posting() · save_application_draft()
+│           list_saved_drafts() · create_gmail_draft()
 └── profile_agent  (LlmAgent)
         └── get_profile() · set_profile_field() · add_to_list()
             remove_from_list() · add_project() · update_project()
@@ -74,6 +85,44 @@ root_agent  (LlmAgent — orchestrator)
 ```
 
 All agents share a `_track_usage` callback that records token counts to `usage_log.json` after every Gemini call.
+
+### Career Page Patrol — How the Auto-Heal Works
+
+```
+career_page_patrol invoked
+  │
+  ├─ Step 1: monitor_career_pages()
+  │          Fetches all 58 career pages, compares hashes to last snapshot.
+  │          Changed page = new postings likely. Fetch failures saved to snapshot.
+  │
+  ├─ Step 2: get_broken_career_urls()
+  │          Reads snapshot for any companies that failed to fetch.
+  │          If none → done.
+  │
+  ├─ Step 3: find_career_page(company, broken_url)  ← for each broken company
+  │          Probes 15 common path suffixes (/careers, /jobs, /about/careers …)
+  │          Then tries 6 job board platforms (Lever, Greenhouse, Workable …)
+  │          Uses HEAD requests — fast, no full page downloads.
+  │
+  └─ Step 4: update_career_page_url(company, new_url)  ← if a live URL found
+             Saves to career_url_overrides.json.
+             Applied automatically on the next scan — no code edits needed.
+```
+
+---
+
+## Monitored Companies (58 total)
+
+| Category | Companies |
+|----------|-----------|
+| **Original watchlist** | Neo Financial, Bold Commerce, Benevity, Symend, Attabotics, Miovision, Helcim, Showpass, Arcurve, 1Password, Jobber, Trulioo |
+| **High-priority targets** | StellarAlgo, Cathedral Energy, Stantec, General Dynamics MS, Verano.AI, Subsurface Dynamics, Knead Tech, Mikata Health, North Vector Dynamics, Ultimarii |
+| **MSPs** | F12.net, Nucleus Networks, GAM Tech, Sure Systems, 403 IT Solutions, Bulletproof IT, Microserve, TWT Group, Long View Systems, Itergy, CompuVision, Managed247, Catalyst IT, SysGen Solutions |
+| **Fintech** | Cashew, Village Wellth, ZayZoon, Katipult, Shareworks (Solium) |
+| **Energy / AI / Data** | Arolytics, Ambyint, Iron Horse, SensorUp, AltaML, Chata.ai, Teradici (HP), White Whale Analytics |
+| **E-commerce / Public** | LodgeLink, City of Calgary IT, Alberta Health Services, University of Calgary |
+| **SAIT Industry Partners** | Pason Systems, Spartan Controls, TC Energy |
+| **Digital Agencies** | Vog App Devs, Robots & Pencils, Evans Hunt, Critical Mass |
 
 ---
 
@@ -127,7 +176,7 @@ Opens automatically at **http://127.0.0.1:7860**
 ```
 QUICK START
   daily brief           Full morning report: emails + job boards
-                        + career page changes + top 3 trends
+                        + career page patrol (monitor + auto-heal) + top 3 trends
   help                  Show the full command reference card
   show usage            Token usage + estimated cost by agent / day / all-time
 
@@ -149,25 +198,30 @@ MISSION 3 — GITHUB TREND INTELLIGENCE
 
 MISSION 4 — JOB HUNTING
   check job boards      Live postings from RemoteOK + Arbeitnow + Canada Job Bank
-                        (Calgary/AB) — plus a Career Support Resources section
-                        listing SAIT Career Services, Centre for Newcomers,
-                        CCIS, ACCES Employment, Alberta Supports, and
-                        Calgary Economic Development
-  check company pages   Scan 12 Calgary/Canadian company career pages
-  which companies are you watching
+                        (Calgary/AB) — entry-level/junior only, senior roles filtered out
+                        Plus a Career Support Resources section listing SAIT Career
+                        Services, Centre for Newcomers, CCIS, ACCES Employment,
+                        Alberta Supports, and Calgary Economic Development
   log I applied to [Company] for [Role]
   show my applications
   any follow-ups needed?
   update application #3 status to interview
 
-MISSION 5 — PROFILE MANAGER
+MISSION 5 — CAREER PAGE PATROL (autonomous)
+  check company pages   Monitor all 58 Calgary company career pages AND
+  patrol career pages   automatically fix any broken URLs in the same run
+  which companies are you watching
+  show url overrides    List all auto-corrected career page URLs
+  update [Company] url to [url]   Manually save a URL correction
+
+MISSION 6 — PROFILE MANAGER
   show my profile
   update my LinkedIn to [url]
   add [skill] to my skills
   add a new project
   set my career goal to [goal]
 
-MISSION 6 — RESUME & COVER LETTER GENERATOR
+MISSION 7 — RESUME & COVER LETTER GENERATOR
   [Dashboard panel] Paste a job URL or description into the purple
   "Resume & Cover Letter Generator" panel and click the button.
   The agent produces a full functional resume + cover letter and
@@ -178,7 +232,7 @@ MISSION 6 — RESUME & COVER LETTER GENERATOR
   how do I match up against this posting: [text]
   show my drafts
 
-MISSION 7 — COLD OUTREACH
+MISSION 8 — COLD OUTREACH
   draft a cold email to a [role] at [Company]
   draft a LinkedIn message to the hiring manager at [Company]
 ```
@@ -189,11 +243,12 @@ MISSION 7 — COLD OUTREACH
 
 | Surface | Protection |
 |---------|-----------|
-| Job board postings | Scam signal scan (auto) — SCAM posts dropped silently |
+| Job board postings | Scam signal scan (auto) — SCAM posts dropped silently; senior roles filtered |
 | Job URLs | Domain safety check (whitelist + TLD + typosquat detection) |
 | Email subjects | Phishing / scam pattern detection (auto) |
 | GitHub repos | Clone Guard audit on request; trend picks auto-audited |
 | Resume job URLs | URL safety check before fetch — SUSPICIOUS domains blocked |
+| Career page URLs | Auto-healed when broken — overrides saved without code changes |
 
 ---
 
@@ -206,7 +261,7 @@ MISSION 7 — COLD OUTREACH
 | UI | Gradio 6 (custom CSS + dark/light mode) |
 | Email — Gmail | Gmail API + OAuth 2.0 |
 | Email — Yahoo | IMAP over SSL |
-| Job boards | RemoteOK API · Arbeitnow API |
+| Job boards | RemoteOK API · Arbeitnow API · Canada Job Bank RSS |
 | GitHub data | GitHub Search REST API |
 | Secrets | `python-dotenv` |
 | Language | Python 3.13 |
@@ -219,13 +274,16 @@ MISSION 7 — COLD OUTREACH
 .env                         — API keys and credentials
 credentials.json             — Google OAuth client secret
 token.json                   — Gmail OAuth token (auto-generated)
+token_compose.json           — Gmail compose OAuth token (auto-generated)
 .sentinel_env/               — Virtual environment
 profile.json                 — Personal profile data
 usage_log.json               — Token usage log
 applications.json            — Job application tracker
 career_page_snapshots.json   — Career page hash cache
+career_url_overrides.json    — Auto-corrected career page URLs
+application_drafts/          — Saved resume + cover letter packages
 ```
 
 ---
 
-*Built April 2026 — SAIT Software Development Program*
+*Built April–May 2026 — SAIT Software Development Program*

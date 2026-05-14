@@ -19,28 +19,99 @@ _PROJECT_ROOT = os.path.dirname(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 )
 _SNAPSHOT_PATH = os.path.join(_PROJECT_ROOT, "career_page_snapshots.json")
+_OVERRIDES_PATH = os.path.join(_PROJECT_ROOT, "career_url_overrides.json")
 
 # ── Target companies ──────────────────────────────────────────────────────────
-# Edit this dict to add or remove companies.
+# Calgary 100 Strategy — organized by category.
 TARGET_COMPANIES: dict[str, str] = {
-    "Neo Financial":       "https://jobs.lever.co/neofinancial",
-    "Bold Commerce":       "https://boldcommerce.com/careers",
-    "Benevity":            "https://benevity.com/careers",
-    "Symend":              "https://symend.com/careers",
-    "Attabotics":          "https://attabotics.com/careers",
-    "Miovision":           "https://miovision.com/careers",
-    "Helcim":              "https://www.helcim.com/careers",
-    "Showpass":            "https://showpass.com/about/careers",
-    "Arcurve":             "https://arcurve.com/careers",
-    "1Password":           "https://jobs.lever.co/1password",
-    "Jobber":              "https://getjobber.com/careers",
-    "Trulioo":             "https://www.trulioo.com/company/careers",
+    # ── Original watchlist (Top 10) ──────────────────────────────────────────
+    "Neo Financial":            "https://jobs.lever.co/neofinancial",
+    "Bold Commerce":            "https://boldcommerce.com/careers",
+    "Benevity":                 "https://benevity.com/careers",
+    "Symend":                   "https://symend.com/careers",
+    "Attabotics":               "https://attabotics.com/careers",
+    "Miovision":                "https://miovision.com/careers",
+    "Helcim":                   "https://www.helcim.com/careers",
+    "Showpass":                 "https://showpass.com/about/careers",
+    "Arcurve":                  "https://arcurve.com/careers",
+    "1Password":                "https://jobs.lever.co/1password",
+    "Jobber":                   "https://getjobber.com/careers",
+    "Trulioo":                  "https://www.trulioo.com/company/careers",
+
+    # ── High-Priority Targets (11-20) ────────────────────────────────────────
+    "StellarAlgo":              "https://stellaralgo.com/careers",
+    "Cathedral Energy":         "https://cathedralenergy.com/careers",
+    "Stantec":                  "https://www.stantec.com/en/careers",
+    "General Dynamics MS":      "https://www.gdmissionsystems.ca/careers",
+    "Verano.AI":                "https://verano.ai/careers",
+    "Subsurface Dynamics":      "https://ssdynamics.com/careers",
+    "Knead Tech":               "https://knead.tech/careers",
+    "Mikata Health":            "https://mikatahealth.com/careers",
+    "North Vector Dynamics":    "https://northvector.ca/careers",
+    "Ultimarii":                "https://ultimarii.com/careers",
+
+    # ── Managed Service Providers (21-25) ────────────────────────────────────
+    "F12.net":                  "https://f12.net/careers",
+    "Nucleus Networks":         "https://nucleusnetworks.ca/careers",
+    "GAM Tech":                 "https://www.gam-tech.ca/careers",
+    "Sure Systems":             "https://suresystems.ca/careers",
+    "403 IT Solutions":         "https://403it.com/careers",
+
+    # ── Additional MSPs (26-40) ──────────────────────────────────────────────
+    "Bulletproof IT":           "https://www.bulletproofsi.com/careers",
+    "Microserve":               "https://microserve.ca/careers",
+    "TWT Group":                "https://twtgroup.com/careers",
+    "Long View Systems":        "https://www.longviewsystems.ca/careers",
+    "Itergy":                   "https://itergy.com/careers",
+    "CompuVision":              "https://compuvision.com/careers",
+    "Managed247":               "https://managed247.com/careers",
+    "Catalyst IT":              "https://catalystit.ca/careers",
+    "SysGen Solutions":         "https://sysgen.ca/careers",
+
+    # ── Fintech Startups (41-45) ─────────────────────────────────────────────
+    "Cashew":                   "https://getcashew.com/careers",
+    "Village Wellth":           "https://villagewellth.com/careers",
+    "ZayZoon":                  "https://zayzoon.com/careers",
+    "Katipult":                 "https://katipult.com/careers",
+    "Shareworks (Solium)":      "https://shareworks.com/careers",
+
+    # ── Energy / AgTech (46-50) ──────────────────────────────────────────────
+    "Arolytics":                "https://arolytics.com/careers",
+    "Ambyint":                  "https://ambyint.com/careers",
+    "Iron Horse":               "https://ironhorse.ca/careers",
+    "SensorUp":                 "https://sensorup.com/careers",
+
+    # ── AI & Data (51-55) ────────────────────────────────────────────────────
+    "AltaML":                   "https://altaml.com/careers",
+    "Chata.ai":                 "https://chata.ai/careers",
+    "Teradici (HP)":            "https://www.teradici.com/company/careers",
+    "White Whale Analytics":    "https://whitewhaleanalytics.com/careers",
+
+    # ── E-commerce (56-59) ───────────────────────────────────────────────────
+    "LodgeLink":                "https://lodgelink.com/careers",
+
+    # ── Public Sector (60-62) ────────────────────────────────────────────────
+    "City of Calgary IT":       "https://www.calgary.ca/careers",
+    "Alberta Health Services":  "https://careers.albertahealthservices.ca",
+    "University of Calgary":    "https://ucalgary.ca/careers",
+
+    # ── SAIT Industry Partners (81-90) ───────────────────────────────────────
+    "Pason Systems":            "https://pason.com/careers",
+    "Spartan Controls":         "https://spartancontrols.com/careers",
+    "TC Energy":                "https://careers.tcenergy.com",
+
+    # ── Digital Agencies (91-100) ────────────────────────────────────────────
+    "Vog App Devs":             "https://vog.ca/careers",
+    "Robots & Pencils":         "https://robotsandpencils.com/careers",
+    "Evans Hunt":               "https://evanshunt.com/careers",
+    "Critical Mass":            "https://www.criticalmassltd.com/careers",
 }
 
 _JOB_KEYWORDS = re.compile(
     r"\b(developer|engineer|software|frontend|backend|fullstack|full.stack|"
     r"python|react|typescript|javascript|node\.?js|next\.?js|junior|entry.level|"
-    r"intern|co.op|new.grad)\b",
+    r"intern|co.op|new.grad|business analyst|systems analyst|data analyst|"
+    r"requirements analyst|analyst)\b",
     re.IGNORECASE,
 )
 
@@ -59,6 +130,25 @@ def _load_snapshots() -> dict:
 def _save_snapshots(data: dict) -> None:
     with open(_SNAPSHOT_PATH, "w") as f:
         json.dump(data, f, indent=2)
+
+
+def _load_url_overrides() -> dict:
+    if os.path.exists(_OVERRIDES_PATH):
+        with open(_OVERRIDES_PATH) as f:
+            return json.load(f)
+    return {}
+
+
+def _apply_overrides(companies: dict[str, str]) -> dict[str, str]:
+    """Returns a copy of companies with any saved URL corrections applied."""
+    overrides = _load_url_overrides()
+    if not overrides:
+        return companies
+    merged = dict(companies)
+    for name, url in overrides.items():
+        if name in merged:
+            merged[name] = url
+    return merged
 
 
 # ── Page fetching + analysis ──────────────────────────────────────────────────
@@ -104,15 +194,22 @@ def monitor_career_pages() -> str:
     """
     snapshots = _load_snapshots()
     now = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+    companies = _apply_overrides(TARGET_COMPANIES)
 
     changed: list[str] = []
     unchanged: list[str] = []
     errors: list[str] = []
 
-    for company, url in TARGET_COMPANIES.items():
+    for company, url in companies.items():
         text = _fetch_page_text(url)
         if text is None:
             errors.append(f"  {company} — could not fetch ({url})")
+            # Persist the error so url_healer can read it
+            snapshots[company] = {
+                "error": "fetch failed — HTTP error or timeout",
+                "url": url,
+                "last_checked": now,
+            }
             continue
 
         current_hash = hashlib.sha256(text.encode()).hexdigest()
@@ -164,8 +261,11 @@ def monitor_career_pages() -> str:
 def list_monitored_companies() -> str:
     """Returns the list of companies currently being monitored and their career page URLs.
 
+    URLs reflect any active overrides from the URL healer.
+
     Returns:
         Formatted list of company names and URLs.
     """
-    lines = [f"  {name}: {url}" for name, url in TARGET_COMPANIES.items()]
-    return f"Monitored companies ({len(TARGET_COMPANIES)}):\n" + "\n".join(lines)
+    companies = _apply_overrides(TARGET_COMPANIES)
+    lines = [f"  {name}: {url}" for name, url in companies.items()]
+    return f"Monitored companies ({len(companies)}):\n" + "\n".join(lines)
