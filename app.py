@@ -674,12 +674,15 @@ if __name__ == "__main__":
     print("   Personal Security & Career Orchestrator")
     print("  ==========================================")
     print()
-    print("  URL : http://127.0.0.1:7860")
+    import socket
+    local_ip = socket.gethostbyname(socket.gethostname())
+    print("  URL (this PC) : http://127.0.0.1:7860")
+    print(f"  URL (phone)   : http://{local_ip}:7860  ← open on any device on same WiFi")
     print("  Stop: Ctrl+C")
     print()
     app = build_ui()
     app.launch(
-        server_name="127.0.0.1",
+        server_name="0.0.0.0",
         inbrowser=True,
         quiet=True,
         css=CSS,
