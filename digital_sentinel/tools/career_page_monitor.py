@@ -105,6 +105,34 @@ TARGET_COMPANIES: dict[str, str] = {
     "Robots & Pencils":         "https://robotsandpencils.com/careers",
     "Evans Hunt":               "https://evanshunt.com/careers",
     "Critical Mass":            "https://www.criticalmassltd.com/careers",
+
+    # ── Recruitment Agencies (Calgary & Canada) ───────────────────────────────
+    "Adecco Canada":            "https://www.adecco.com/en-ca/job-search",
+    "Robert Half":              "https://www.roberthalf.com/ca/en/find-jobs",
+    "Hays Canada":              "https://www.hays.ca/job-search",
+    "Randstad Canada":          "https://www.randstad.ca/",
+    "S.I. Systems":             "https://www.sisystems.com/",
+    "Agilus":                   "https://en.agilus.ca/jobs/jobsearch",
+    "David Aplin Group":        "https://www.aplin.com/job-seekers/",
+    "ManpowerGroup Canada":     "https://www.manpowergroup.com/en",
+    "Raise (Ian Martin)":       "https://raise.jobs/job-search/",
+    "About Staffing":           "https://aboutstaffing.com/",
+    "Diversified Staffing":     "https://diversifiedstaffing.com/job-seekers/",
+    "Matrix HR":                "https://matrixlabourleasing.com/pages/find-jobs",
+
+    # ── Tech-Specific Job Boards ─────────────────────────────────────────────
+    "ITjobs.ca":                "https://www.itjobs.ca/en/",
+    "Tech Jobs Canada":         "https://www.techjobs.ca/en/",
+    "Canadian Cybersecurity Jobs": "https://canadiancybersecurityjobs.com/",
+    "IEEE Jobs":                "https://jobs.ieee.org/",
+
+    # ── General Canadian Job Boards ───────────────────────────────────────────
+    "Adzuna Canada":            "https://www.adzuna.ca/",
+    "SimplyHired Canada":       "https://www.simplyhired.ca/",
+    "AlbertaJobCentre":         "https://www.albertajobcentre.ca/",
+    "Royal Municipalities AB":  "https://rmalberta.com/job-board/",
+    "Careers Next Generation":  "https://www.careersnextgen.ca/",
+    "NoDesk Canada":            "https://nodesk.co/remote-jobs/canada/",
 }
 
 _JOB_KEYWORDS = re.compile(

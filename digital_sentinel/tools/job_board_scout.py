@@ -101,17 +101,49 @@ _ELUTA_HEADERS = {
 _CAREER_SUPPORT_RESOURCES = """\
 ── Career Support Resources (Calgary & Canada) ──
 
-The following free services are used by SAIT career advisors, newcomer
-centres, and immigrant employment programs to help job seekers find roles.
+LIVE SOURCES (searched above)
+  Canada Job Bank       https://www.jobbank.gc.ca
+  Eluta.ca              https://www.eluta.ca
+  WeWork Remotely       https://weworkremotely.com
+  RemoteOK              https://remoteok.com
+  Arbeitnow             https://arbeitnow.com
 
-  Canada Job Bank (live above)  https://www.jobbank.gc.ca
-  Eluta.ca (live above)         https://www.eluta.ca
-  SAIT Career Services          https://www.sait.ca/student-life/student-services/career-services
-  Centre for Newcomers Calgary  https://www.centrefornewcomers.ca
-  Calgary Catholic Immigration Society (CCIS)  https://www.ccis-calgary.ab.ca
-  ACCES Employment              https://accesemployment.ca
-  Alberta Supports              https://www.alberta.ca/alberta-supports
-  Calgary Economic Development  https://calgaryeconomicdevelopment.com
+ADDITIONAL JOB BOARDS (check manually or via career page patrol)
+  ITjobs.ca             https://www.itjobs.ca/en/
+  Tech Jobs Canada      https://www.techjobs.ca/en/
+  Adzuna Canada         https://www.adzuna.ca/
+  SimplyHired Canada    https://www.simplyhired.ca/
+  NoDesk (Remote CA)    https://nodesk.co/remote-jobs/canada/
+  Working Nomads        https://www.workingnomads.com/remote-canada-jobs
+  AlbertaJobCentre      https://www.albertajobcentre.ca/
+  Royal Municipalities  https://rmalberta.com/job-board/
+  Careers Next Gen      https://www.careersnextgen.ca/
+  Canadian Cybersecurity Jobs  https://canadiancybersecurityjobs.com/
+  FlexJobs (Remote CA)  https://www.flexjobs.com/remote-jobs/world/Canada (paid)
+
+RECRUITMENT AGENCIES (monitored via career page patrol)
+  Adecco Canada         https://www.adecco.com/en-ca/job-search
+  Robert Half           https://www.roberthalf.com/ca/en/find-jobs
+  Hays Canada           https://www.hays.ca/job-search
+  Randstad Canada       https://www.randstad.ca/
+  S.I. Systems          https://www.sisystems.com/
+  Agilus                https://en.agilus.ca/jobs/jobsearch
+  David Aplin Group     https://www.aplin.com/job-seekers/
+  ManpowerGroup         https://www.manpowergroup.com/en
+  Raise (Ian Martin)    https://raise.jobs/job-search/
+  About Staffing        https://aboutstaffing.com/
+  Diversified Staffing  https://diversifiedstaffing.com/job-seekers/
+  Matrix HR             https://matrixlabourleasing.com/pages/find-jobs
+
+CAREER SERVICES & RESOURCES
+  SAIT Career Services  https://www.sait.ca/student-life/student-services/career-services
+  Calgary Economic Dev (Tech)  https://www.calgaryeconomicdevelopment.com/sectors/technology/techecosystem/
+  ALIS Alberta          https://alis.alberta.ca/look-for-work/find-work/job-banks-and-work-search-tools/employer-job-banks-by-industry/
+  CareerWise Remote List  https://careerwise.ceric.ca/2024/07/18/remote-freelance-job-boards/
+  Centre for Newcomers  https://www.centrefornewcomers.ca
+  CCIS Calgary          https://www.ccis-calgary.ab.ca
+  ACCES Employment      https://accesemployment.ca
+  Alberta Supports      https://www.alberta.ca/alberta-supports
 """
 
 # Priority order: BA → AI/ML → FRONTEND → BACKEND → MATCH → REVIEW
@@ -227,6 +259,58 @@ def _fetch_job_bank_canada() -> list[dict]:
             break  # One network error covers both searches
 
     return results or [{"_error": "Job Bank Canada: No results returned"}]
+
+
+def _fetch_weworkremotely() -> list[dict]:
+    """Fetches remote programming job postings from WeWork Remotely via RSS.
+
+    Covers full-time remote roles open worldwide or Canada-specific.
+    Title format in feed: "Company: Job Title" — parsed and split.
+    """
+    results: list[dict] = []
+    seen: set[str] = set()
+
+    try:
+        resp = requests.get(
+            "https://weworkremotely.com/categories/remote-programming-jobs.rss",
+            headers=_HEADERS,
+            timeout=15,
+        )
+        resp.raise_for_status()
+
+        root = ET.fromstring(resp.content)
+        for item in root.findall(".//item"):
+            def _t(tag: str) -> str:
+                el = item.find(tag)
+                return (el.text or "").strip() if el is not None else ""
+
+            raw_title = _t("title")
+            url       = _t("link")
+            region    = _t("region")
+
+            if not raw_title or url in seen:
+                continue
+            seen.add(url)
+
+            # Feed titles are "Company: Job Title"
+            if ": " in raw_title:
+                company, job_title = raw_title.split(": ", 1)
+            else:
+                company, job_title = "See listing", raw_title
+
+            results.append({
+                "position": job_title.strip(),
+                "company":  company.strip(),
+                "url":      url,
+                "tags":     ["Remote", region or "Worldwide", "WeWorkRemotely"],
+            })
+
+    except ET.ParseError as e:
+        results.append({"_error": f"WeWorkRemotely: RSS parse error — {e}"})
+    except Exception as e:
+        results.append({"_error": f"WeWorkRemotely: {e}"})
+
+    return results or [{"_error": "WeWorkRemotely: No results returned"}]
 
 
 def _fetch_eluta() -> list[dict]:
@@ -346,6 +430,7 @@ def fetch_job_board_postings(max_results: int = 60) -> str:
         ("Arbeitnow",         _fetch_arbeitnow()),
         ("Job Bank Canada",   _fetch_job_bank_canada()),
         ("Eluta.ca",          _fetch_eluta()),
+        ("WeWorkRemotely",    _fetch_weworkremotely()),
     ]
 
     buckets: dict[str, list[str]] = {p: [] for p in _PRIORITY_ORDER}
@@ -392,7 +477,7 @@ def fetch_job_board_postings(max_results: int = 60) -> str:
             count += 1
 
     sep = "=" * 46
-    report = f"\n{sep}\n JOB BOARD SCOUT  (RemoteOK · Arbeitnow · Job Bank Canada · Eluta.ca)\n{sep}\n"
+    report = f"\n{sep}\n JOB BOARD SCOUT  (RemoteOK · Arbeitnow · Job Bank Canada · Eluta.ca · WeWorkRemotely)\n{sep}\n"
     report += "\nPriority: Business Analyst → Frontend → Backend → Other Entry-Level → Reviewing\n"
 
     any_results = False
@@ -419,7 +504,7 @@ def fetch_job_board_postings(max_results: int = 60) -> str:
         f"\nSummary: {totals['BA']} BA · {totals['AI']} AI/ML · "
         f"{totals['FRONTEND']} Frontend · {totals['BACKEND']} Backend · "
         f"{totals['MATCH']} other entry-level · {totals['REVIEW']} to review "
-        f"— sourced from RemoteOK, Arbeitnow, Job Bank Canada, and Eluta.ca.\n"
+        f"— sourced from RemoteOK, Arbeitnow, Job Bank Canada, Eluta.ca, and WeWorkRemotely.\n"
     )
     report += f"{sep}\n"
     report += f"\n{_CAREER_SUPPORT_RESOURCES}"
