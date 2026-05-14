@@ -60,6 +60,24 @@ _JOB_BANK_SEARCHES = [
     {"searchstring": "web developer",      "locationstring": "Calgary", "fprov": "AB"},
 ]
 
+# Eluta.ca — Canadian job aggregator, Calgary-focused searches
+_ELUTA_SEARCHES = [
+    {"q": "software developer", "l": "Calgary, AB"},
+    {"q": "web developer",      "l": "Calgary, AB"},
+    {"q": "junior developer",   "l": "Calgary, AB"},
+]
+
+# Browser User-Agent — Eluta.ca requires it for search pages
+_ELUTA_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/124.0.0.0 Safari/537.36"
+    ),
+    "Accept-Language": "en-CA,en;q=0.9",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+}
+
 # Career support organizations whose advisors direct clients to Job Bank and
 # these boards — surfaced as a resource block at the bottom of every report
 _CAREER_SUPPORT_RESOURCES = """\
@@ -69,6 +87,7 @@ The following free services are used by SAIT career advisors, newcomer
 centres, and immigrant employment programs to help job seekers find roles.
 
   Canada Job Bank (live above)  https://www.jobbank.gc.ca
+  Eluta.ca (live above)         https://www.eluta.ca
   SAIT Career Services          https://www.sait.ca/student-life/student-services/career-services
   Centre for Newcomers Calgary  https://www.centrefornewcomers.ca
   Calgary Catholic Immigration Society (CCIS)  https://www.ccis-calgary.ab.ca
@@ -188,6 +207,88 @@ def _fetch_job_bank_canada() -> list[dict]:
     return results or [{"_error": "Job Bank Canada: No results returned"}]
 
 
+def _fetch_eluta() -> list[dict]:
+    """Fetches Calgary software job postings from Eluta.ca (Canadian job aggregator).
+
+    Eluta.ca aggregates directly from employer career pages, so it surfaces roles
+    that never appear on LinkedIn or international boards. Individual job links use
+    client-side JavaScript routing, so the URL returned is the Eluta.ca search URL
+    for that query — clicking it lands on the live results page.
+    """
+    results: list[dict] = []
+    seen: set[str] = set()
+
+    # Regex patterns to extract job data from server-rendered HTML
+    # Eluta renders anchor tags with job titles — href may be "#!" (JS-routed)
+    # but the text content is always in the HTML source.
+    _title_re = re.compile(
+        r'<a\b[^>]*href="[^"]*"[^>]*>\s*([A-Z][^<]{4,100}?)\s*</a>',
+        re.IGNORECASE,
+    )
+    _company_re = re.compile(
+        r'<a\b[^>]*title="See all jobs at ([^"]{2,80})"',
+        re.IGNORECASE,
+    )
+    # Fallback: bold/strong text that follows a job title line (often company name)
+    _company_fallback_re = re.compile(
+        r'<(?:b|strong)[^>]*>\s*([^<]{2,80})\s*</(?:b|strong)>',
+        re.IGNORECASE,
+    )
+    # Detect job-title-like text (contains a role keyword)
+    _role_re = re.compile(
+        r'\b(developer|engineer|analyst|programmer|designer|technician|'
+        r'architect|administrator|specialist|coordinator|scientist)\b',
+        re.IGNORECASE,
+    )
+
+    for params in _ELUTA_SEARCHES:
+        search_url = (
+            f"https://www.eluta.ca/search"
+            f"?q={params['q'].replace(' ', '+')}"
+            f"&l={params['l'].replace(' ', '+').replace(',', '%2C')}"
+        )
+        try:
+            resp = requests.get(
+                "https://www.eluta.ca/search",
+                params={**params, "sort": "rank"},
+                headers=_ELUTA_HEADERS,
+                timeout=15,
+            )
+            resp.raise_for_status()
+            html = resp.text
+
+            # Extract all company names via Eluta's consistent title attribute
+            companies = _company_re.findall(html)
+
+            # Extract all anchor text that looks like a job title
+            all_anchors = _title_re.findall(html)
+            job_titles = [
+                t.strip() for t in all_anchors
+                if _role_re.search(t) and 8 < len(t.strip()) < 120
+            ]
+
+            # Pair titles with companies — they appear in the same order on page
+            for i, title in enumerate(job_titles):
+                dedup = title.lower()
+                if dedup in seen:
+                    continue
+                seen.add(dedup)
+
+                company = companies[i] if i < len(companies) else "See listing"
+
+                results.append({
+                    "position": title,
+                    "company":  company,
+                    "url":      search_url,
+                    "tags":     ["Calgary", "AB", "Eluta.ca", "Canada"],
+                })
+
+        except Exception as e:
+            results.append({"_error": f"Eluta.ca ({params['q']}): {e}"})
+
+    return results or [{"_error": "Eluta.ca: No results returned"}]
+
+
 def _format_job(source: str, title: str, company: str, tags: str, url: str, scam_risk: str = "CLEAR") -> str:
     risk_tag = "" if scam_risk == "CLEAR" else f"  [!] SCAM RISK: {scam_risk}\n"
     return (
@@ -222,6 +323,7 @@ def fetch_job_board_postings(max_results: int = 60) -> str:
         ("RemoteOK",          _fetch_remoteok()),
         ("Arbeitnow",         _fetch_arbeitnow()),
         ("Job Bank Canada",   _fetch_job_bank_canada()),
+        ("Eluta.ca",          _fetch_eluta()),
     ]
 
     buckets: dict[str, list[str]] = {p: [] for p in _PRIORITY_ORDER}
@@ -268,7 +370,7 @@ def fetch_job_board_postings(max_results: int = 60) -> str:
             count += 1
 
     sep = "=" * 46
-    report = f"\n{sep}\n JOB BOARD SCOUT  (RemoteOK · Arbeitnow · Job Bank Canada)\n{sep}\n"
+    report = f"\n{sep}\n JOB BOARD SCOUT  (RemoteOK · Arbeitnow · Job Bank Canada · Eluta.ca)\n{sep}\n"
     report += "\nPriority: Business Analyst → Frontend → Backend → Other Entry-Level → Reviewing\n"
 
     any_results = False
@@ -294,7 +396,7 @@ def fetch_job_board_postings(max_results: int = 60) -> str:
     report += (
         f"\nSummary: {totals['BA']} BA · {totals['FRONTEND']} Frontend · "
         f"{totals['BACKEND']} Backend · {totals['MATCH']} other entry-level · "
-        f"{totals['REVIEW']} to review — sourced from RemoteOK, Arbeitnow, and Job Bank Canada.\n"
+        f"{totals['REVIEW']} to review — sourced from RemoteOK, Arbeitnow, Job Bank Canada, and Eluta.ca.\n"
     )
     report += f"{sep}\n"
     report += f"\n{_CAREER_SUPPORT_RESOURCES}"
