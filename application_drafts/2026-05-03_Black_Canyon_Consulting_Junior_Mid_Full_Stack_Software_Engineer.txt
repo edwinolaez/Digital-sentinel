@@ -1,0 +1,29 @@
+============================================================
+APPLICATION DRAFT
+Company  : Black Canyon Consulting
+Role     : Junior Mid Full Stack Software Engineer
+Date     : 2026-05-03
+URL      : https://remoteOK.com/remote-jobs/remote-junior-mid-full-stack-software-engineer-black-canyon-consulting-1131437
+============================================================
+
+COVER LETTER
+------------------------------------------------------------
+Dear Black Canyon Consulting Hiring Team,
+
+I am writing to express my strong interest in the Junior Mid Full Stack Software Engineer position, particularly drawn by the opportunity to contribute to building "knowledge-first systems that turn fragmented scientific and enterprise data into structured, reusable knowledge assets that support explainable reasoning, governed analytics, and trustworthy AI." As a graduating Software Developer from SAIT with a passion for full-stack development and AI-powered applications, I am eager to apply my skills to such innovative and impactful projects.
+
+My experience developing multi-agent AI systems, like "Digital Sentinel," has equipped me with a robust understanding of full-stack development, complex data orchestration, and API integrations. This project, leveraging Python, Google ADK, and Gemini 2.5 Flash, involved designing and implementing intelligent workflows and handling diverse data streams – skills directly applicable to creating structured knowledge assets. Additionally, my work on the "CAF C2 System" and "Wildfire Intelligence Crew" demonstrates my ability to build real-time, data-driven applications with strong backend components using Python and REST APIs, showcasing my capacity for hands-on engineering focused on building robust systems.
+
+I am actively seeking my first software development role and am confident that my foundational skills in Python, TypeScript, React, and Next.js, coupled with my exposure to system architecture and tools like Git and Docker (as part of my learning), would allow me to quickly become a valuable member of your team. I am excited by the prospect of contributing to Black Canyon Consulting's mission and am available for a conversation to discuss how my technical background and enthusiasm for AI can support your goals. Thank you for your consideration.
+
+Sincerely,
+Edwin Olaez
+
+TAILORED RESUME BULLETS
+------------------------------------------------------------
+*   Developed "Digital Sentinel," a multi-agent AI system, demonstrating full-stack capabilities in Python and integrating diverse APIs to create intelligent workflows.
+*   Engineered backend solutions with Python (Flask/FastAPI) and Node.js, including REST APIs for real-time data ingestion and management in projects like "Wildfire Intelligence Crew."
+*   Designed and implemented real-time command and control systems, showcasing proficiency in complex system architecture and data handling (e.g., MAVLink protocol).
+*   Gained experience in developing robust, data-driven applications, aligning with the creation of "structured, reusable knowledge assets" and "trustworthy AI."
+
+============================================================

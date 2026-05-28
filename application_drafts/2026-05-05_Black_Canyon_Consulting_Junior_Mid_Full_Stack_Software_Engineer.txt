@@ -1,0 +1,56 @@
+============================================================
+APPLICATION DRAFT
+Company  : Black Canyon Consulting
+Role     : Junior Mid Full Stack Software Engineer
+Date     : 2026-05-05
+URL      : https://remoteOK.com/remote-jobs/remote-junior-mid-full-stack-software-engineer-black-canyon-consulting-1131437
+============================================================
+
+FULL RESUME
+------------------------------------------------------------
+Edwin Olaez
+Calgary, AB | edwinolaez@yahoo.com
+Junior Mid Full Stack Software Engineer
+
+PROFESSIONAL SUMMARY
+Highly motivated and results-oriented Software Developer with a strong foundation in full-stack development and a passion for building intelligent systems. Graduating from SAIT in August 2026, I am eager to apply my expertise in Next.js, React, Python, and Node.js to contribute to innovative projects, particularly in the realm of knowledge-first systems and trustworthy AI.
+
+HIGHLIGHTS OF QUALIFICATIONS
+*   **Comprehensive Software Development Training:** Completing a Software Development Diploma from SAIT in August 2026, providing a solid theoretical and practical foundation in modern software engineering.
+*   **Full-Stack Proficiency:** Demonstrated ability to develop and deploy end-to-end applications using React, Next.js for frontend, and Python (Flask, FastAPI) or Node.js for robust backend services.
+*   **AI and Multi-Agent System Experience:** Designed and implemented a multi-agent AI personal assistant using Google ADK and Gemini 2.5 Flash, showcasing skills in advanced system design and intelligent automation.
+*   **Real-time Data Integration:** Developed and integrated systems for real-time data ingestion and telemetry, including MAVLink protocol over multicast UDP and satellite data feeds with REST APIs.
+*   **DevOps Exposure (Conceptual):** Familiarity with Git/GitHub for version control and collaborative development, understanding principles of system and security from project work.
+*   **Problem-Solving & Collaboration:** Proven ability to deliver functional systems under tight deadlines, as evidenced by a hackathon project, and to collaborate effectively in team environments.
+
+SKILLS
+Python | TypeScript | JavaScript | React | Next.js | Node.js | Flask | FastAPI | SQL | MongoDB | Git | GitHub | VS Code | Google ADK | Gemini API | REST APIs | OAuth 2.0 | Multi-agent systems | Web Development | System Design | Backend Development
+
+RELEVANT EXPERIENCE
+
+AI & System Design
+*   **Digital Sentinel (Multi-agent AI Personal Assistant):** Engineered a sophisticated multi-agent AI system utilizing Google ADK and Gemini 2.5 Flash to manage personal security and career orchestration, including real-time scam detection and intelligent job hunting across various APIs.
+*   **CAF C2 System (Real-time Command and Control):** Developed a real-time command and control system for drone telemetry during a hackathon, successfully integrating MAVLink protocol over multicast UDP to provide a live dashboard of drone state and mission status.
+
+Full Stack & Data Integration
+*   **Wildfire Intelligence Crew (Global Fire Monitoring System):** Built a global fire monitoring system featuring a REST API backend for real-time satellite data ingestion and a frontend dashboard for immediate visualization and alerting.
+*   **Web Application Development:** Applied expertise in React and Next.js to create dynamic and responsive user interfaces, complemented by robust backend services using Node.js and Python frameworks for seamless data flow and functionality.
+
+EDUCATION
+Diploma in Software Development 2026
+Southern Alberta Institute of Technology (SAIT), Calgary, AB
+
+COVER LETTER
+------------------------------------------------------------
+Dear Hiring Team at Black Canyon Consulting,
+
+I am writing to express my enthusiastic interest in the Junior Mid Full Stack Software Engineer position at Black Canyon Consulting, particularly drawn to your work with Knowledge3 in delivering "knowledge-first systems" and supporting "trustworthy AI." The opportunity to contribute to systems that transform fragmented scientific and enterprise data into structured, reusable knowledge assets resonates deeply with my academic background and project experience.
+
+During my studies at SAIT, I developed a multi-agent AI personal assistant, "Digital Sentinel," which exemplifies my capability in designing and implementing intelligent systems for complex data orchestration and reasoning. This project, built with Python, Google ADK, and Gemini 2.5 Flash, required a keen understanding of API integration, real-time data processing, and the development of robust backend services – skills directly applicable to your mission of creating explainable reasoning and governed analytics.
+
+I am set to graduate in August 2026 and am eager to apply my full-stack proficiency in Next.js, React, Python, and Node.js in a hands-on engineering role. I am confident that my technical skills, coupled with a proactive approach to problem-solving, would make me a valuable addition to your team. Thank you for considering my application. I look forward to the possibility of discussing how I can contribute to Black Canyon Consulting.
+
+Sincerely,
+Edwin Olaez
+
+============================================================

@@ -1,0 +1,29 @@
+============================================================
+APPLICATION DRAFT
+Company  : Infiniti Group
+Role     : Entry Level Crypto Market Specialist
+Date     : 2026-05-03
+URL      : https://remoteOK.com/remote-jobs/remote-entry-level-crypto-market-specialist-infiniti-group-1131416
+============================================================
+
+COVER LETTER
+------------------------------------------------------------
+Dear Infiniti Group Hiring Team,
+
+I am writing to express my keen interest in the Entry Level Crypto Market Specialist position. I am particularly excited by Infiniti Group's focus on digital assets, market research, and data-driven trading solutions, and the opportunity to develop professional skills within a real market environment. As a graduating Software Developer from SAIT, I possess a strong analytical mindset and a foundational skillset in building data-intensive applications, which I am eager to apply and expand within the dynamic crypto space.
+
+Although my background is in software development, my projects have equipped me with highly transferable skills for this role. For instance, my "Digital Sentinel" project, a multi-agent AI personal assistant, involved sophisticated data processing and the design of intelligent, responsive systems – experiences that align with understanding complex market behavior and structured decision-making. Similarly, my "Wildfire Intelligence Crew" project focused on real-time data ingestion and analysis from satellite feeds for global monitoring, demonstrating my ability to extract critical insights from fast-moving data streams.
+
+I am actively seeking an entry-level opportunity where I can leverage my analytical capabilities and technical foundation to contribute meaningfully. The prospect of learning how crypto markets operate in practice and contributing to data-driven strategies at Infiniti Group is incredibly compelling. I am a quick learner, enthusiastic about new technologies, and confident I can rapidly become a valuable asset to your team. Thank you for your consideration.
+
+Sincerely,
+Edwin Olaez
+
+TAILORED RESUME BULLETS
+------------------------------------------------------------
+*   Developed multi-agent AI systems requiring complex data processing and structured decision-making, applicable to understanding market behavior.
+*   Engineered real-time data ingestion and analysis solutions, demonstrating ability to work with dynamic information streams for critical insights.
+*   Built robust backend systems for data management and API integrations, showcasing a strong foundation in structured problem-solving.
+*   Applied analytical skills to transform raw data into actionable intelligence across various software development projects.
+
+============================================================

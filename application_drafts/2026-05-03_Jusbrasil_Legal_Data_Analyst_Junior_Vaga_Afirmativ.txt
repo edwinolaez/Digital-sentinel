@@ -1,0 +1,29 @@
+============================================================
+APPLICATION DRAFT
+Company  : Jusbrasil
+Role     : Legal Data Analyst Junior Vaga Afirmativa para PCD
+Date     : 2026-05-03
+URL      : https://remoteOK.com/remote-jobs/remote-legal-data-analyst-junior-vaga-afirmativa-para-pcd-jusbrasil-1131393
+============================================================
+
+COVER LETTER
+------------------------------------------------------------
+Dear Jusbrasil Hiring Team,
+
+I am writing to express my enthusiastic interest in the Legal Data Analyst Junior Vaga Afirmativa para PCD role at Jusbrasil. Your commitment to being an "AI-first empresa" that leverages generative AI, massive data, and cutting-edge engineering to solve complex problems deeply resonates with my passion for applying technology to create real-world impact. As a graduating Software Developer from SAIT, I am eager to contribute my skills to an organization at the forefront of innovation in the legal tech space.
+
+My capstone project, "Digital Sentinel," a multi-agent AI personal assistant, exemplifies my ability to tackle complex data challenges and develop intelligent systems. This project, built with Python, Google ADK, and Gemini 2.5 Flash, involved managing diverse data streams, orchestrating specialized sub-agents, and implementing real-time scam detection. This experience, particularly with processing large datasets and developing AI-powered solutions, aligns well with Jusbrasil's focus on handling "petabytes de dados" and "bilhões de documentos" to redefine the legal market.
+
+I am confident that my strong foundation in Python, coupled with my experience in building robust, data-driven applications, would allow me to quickly make meaningful contributions to your team. I am actively seeking my first software development role and am keen to learn more about how my analytical and development skills can support Jusbrasil's mission to transform the justice system with technology. Thank you for your time and consideration.
+
+Sincerely,
+Edwin Olaez
+
+TAILORED RESUME BULLETS
+------------------------------------------------------------
+*   Developed "Digital Sentinel," a multi-agent AI system, demonstrating proficiency in processing diverse data streams and orchestrating complex workflows.
+*   Engineered real-time data ingestion and alerting for a global fire monitoring system, handling large volumes of satellite data.
+*   Applied Python and AI principles to construct intelligent solutions, aligning with Jusbrasil's AI-first approach to complex problem-solving.
+*   Gained experience in system design and data handling through projects involving MAVLink protocol, multicast UDP, and REST APIs for real-time applications.
+
+============================================================

@@ -4,13 +4,14 @@ Watches a curated list of Calgary/Canadian tech company career pages for changes
 Stores content hashes between runs and reports pages that have been updated,
 indicating likely new job postings.
 """
+import asyncio
 import hashlib
 import json
 import os
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 
-import requests
+import httpx
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -179,18 +180,7 @@ def _apply_overrides(companies: dict[str, str]) -> dict[str, str]:
     return merged
 
 
-# ── Page fetching + analysis ──────────────────────────────────────────────────
-
-def _fetch_page_text(url: str) -> str | None:
-    try:
-        resp = requests.get(url, headers=_HEADERS, timeout=15)
-        resp.raise_for_status()
-        text = re.sub(r"<[^>]+>", " ", resp.text)
-        text = re.sub(r"\s+", " ", text).strip()
-        return text
-    except Exception:
-        return None
-
+# ── Page analysis ─────────────────────────────────────────────────────────────
 
 def _extract_snippets(text: str, max_snippets: int = 6) -> list[str]:
     sentences = re.split(r"[.\n|•·]", text)
@@ -202,6 +192,47 @@ def _extract_snippets(text: str, max_snippets: int = 6) -> list[str]:
         if len(snippets) >= max_snippets:
             break
     return snippets
+
+
+# ── Async fetch helpers ───────────────────────────────────────────────────────
+
+async def _fetch_one(
+    client: httpx.AsyncClient,
+    semaphore: asyncio.Semaphore,
+    company: str,
+    url: str,
+) -> tuple[str, str, str | None, str | None]:
+    async with semaphore:
+        try:
+            resp = await client.get(url, timeout=httpx.Timeout(5.0, connect=3.0))
+            resp.raise_for_status()
+            text = re.sub(r"<[^>]+>", " ", resp.text)
+            text = re.sub(r"\s+", " ", text).strip()
+            return company, url, text, None
+        except Exception as e:
+            return company, url, None, str(e)
+
+
+async def _fetch_all(companies_urls: list[tuple[str, str]]) -> list[tuple]:
+    semaphore = asyncio.Semaphore(15)
+    async with httpx.AsyncClient(
+        follow_redirects=True,
+        headers=_HEADERS,
+    ) as client:
+        tasks = [_fetch_one(client, semaphore, c, u) for c, u in companies_urls]
+        return await asyncio.gather(*tasks)
+
+
+def _run_async(coro):
+    """Run a coroutine safely whether or not an event loop is already running."""
+    try:
+        asyncio.get_running_loop()
+        # Inside a running loop (e.g. Gradio) — spin up a fresh thread
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            return pool.submit(asyncio.run, coro).result()
+    except RuntimeError:
+        return asyncio.run(coro)
 
 
 # ── Public tool ───────────────────────────────────────────────────────────────
@@ -218,21 +249,38 @@ def monitor_career_pages() -> str:
 
     Returns:
         A report listing changed pages (with job-relevant snippets),
-        unchanged pages, and any fetch errors.
+        unchanged pages, fetch errors, and any skipped dead URLs.
     """
     snapshots = _load_snapshots()
-    now = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+    now_dt = datetime.utcnow()
+    now = now_dt.strftime("%Y-%m-%d %H:%M UTC")
     companies = _apply_overrides(TARGET_COMPANIES)
+
+    # Dead URL skip: companies with errors checked within the last 24 hours
+    skip_set: set[str] = set()
+    for name, snap in snapshots.items():
+        if "error" not in snap:
+            continue
+        last_checked_str = snap.get("last_checked", "")
+        try:
+            last_checked = datetime.strptime(last_checked_str, "%Y-%m-%d %H:%M UTC")
+            if now_dt - last_checked < timedelta(hours=24):
+                skip_set.add(name)
+        except ValueError:
+            pass
+
+    to_fetch = [(c, u) for c, u in companies.items() if c not in skip_set]
 
     changed: list[str] = []
     unchanged: list[str] = []
     errors: list[str] = []
 
-    for company, url in companies.items():
-        text = _fetch_page_text(url)
-        if text is None:
+    results = _run_async(_fetch_all(to_fetch))
+
+    for company, url, text, error in results:
+        if error is not None or text is None:
+            err_msg = (error or "fetch failed")[:100]
             errors.append(f"  {company} — could not fetch ({url})")
-            # Persist the error so url_healer can read it
             snapshots[company] = {
                 "error": "fetch failed — HTTP error or timeout",
                 "url": url,
@@ -281,6 +329,9 @@ def monitor_career_pages() -> str:
 
     if errors:
         report += f"\nFetch errors ({len(errors)}):\n" + "\n".join(errors) + "\n"
+
+    if skip_set:
+        report += f"\nSkipped {len(skip_set)} companies (known unreachable, checked <24h ago)\n"
 
     report += f"\n{sep}\n"
     return report

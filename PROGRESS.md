@@ -148,6 +148,34 @@ Runs fully locally. No deployment required.
 
 ---
 
+### Phase 11 — ATS Scanner Tab
+**Status: Complete**
+
+- New "ATS Scanner" tab added to Gradio UI alongside existing Chat tab
+- Two-column paste interface: resume text (left) + job posting (right)
+- Direct Gemini 2.5 Flash call — bypasses ADK agent pipeline for speed
+- Returns structured JSON: match score, verdict, keyword found/missing/partial, structural issues, top recommendation
+- Results rendered as HTML: score circle + bar, badge pills (green/red/yellow), recommendation box
+- Full dark mode support integrated into existing JS_TOGGLE CSS block
+- No new dependencies — uses existing `GOOGLE_API_KEY` and `google-genai` SDK
+
+---
+
+### Phase 12 — Performance Optimisation
+**Status: Complete**
+
+- `career_page_monitor.py` rewritten with asyncio + httpx concurrent fetching
+  - Max 15 concurrent requests via `asyncio.Semaphore(15)`
+  - Per-request timeout reduced to 5s (connect 3s)
+  - 82-company scan now completes in ~20-30s (was 60-120s sequential)
+- `job_board_scout.py` — RemoteOK, Arbeitnow, Job Bank Canada, Eluta.ca, and WeWorkRemotely now fetched concurrently with `asyncio.gather()`
+  - Job Bank Canada sub-searches (5 queries) run concurrently within the fetcher
+  - Eluta.ca sub-searches (8 queries) run concurrently within the fetcher
+- Dead URL skip logic: companies with errors checked <24h ago are skipped, saving ~40s per run on known unreachable URLs
+- No changes to agent interfaces, output formats, or ADK tool signatures
+
+---
+
 ## Feature Status
 
 | Feature | Status |

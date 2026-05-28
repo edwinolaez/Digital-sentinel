@@ -5,10 +5,11 @@ Canada Job Bank is the primary resource recommended by SAIT career advisors,
 the Centre for Newcomers, CCIS, and other Calgary employment support services.
 Every posting is scanned for scam signals before being surfaced.
 """
+import asyncio
 import re
 import xml.etree.ElementTree as ET
 
-import requests
+import httpx
 
 from .scam_detector import scan_for_scam_signals
 
@@ -186,98 +187,91 @@ def _score(text: str) -> str | None:
     return None
 
 
-def _fetch_remoteok() -> list[dict]:
+# ── Async fetch functions ─────────────────────────────────────────────────────
+
+async def _fetch_remoteok_async(client: httpx.AsyncClient) -> list[dict]:
     try:
-        resp = requests.get(
-            "https://remoteok.com/api",
-            headers=_HEADERS,
-            timeout=15,
-        )
+        resp = await client.get("https://remoteok.com/api", timeout=10.0)
         resp.raise_for_status()
         return [j for j in resp.json() if isinstance(j, dict) and j.get("position")]
     except Exception as e:
         return [{"_error": f"RemoteOK: {e}"}]
 
 
-def _fetch_arbeitnow() -> list[dict]:
+async def _fetch_arbeitnow_async(client: httpx.AsyncClient) -> list[dict]:
     try:
-        resp = requests.get(
-            "https://arbeitnow.com/api/job-board-api",
-            headers=_HEADERS,
-            timeout=15,
-        )
+        resp = await client.get("https://arbeitnow.com/api/job-board-api", timeout=10.0)
         resp.raise_for_status()
         return resp.json().get("data", [])
     except Exception as e:
         return [{"_error": f"Arbeitnow: {e}"}]
 
 
-def _fetch_job_bank_canada() -> list[dict]:
-    """Fetches Calgary software/web developer postings from Canada Job Bank via RSS."""
+async def _fetch_job_bank_one(
+    client: httpx.AsyncClient, params: dict
+) -> list[dict]:
     results: list[dict] = []
+    try:
+        resp = await client.get(
+            "https://www.jobbank.gc.ca/jobsearch/rss",
+            params={**params, "lang": "eng"},
+            timeout=10.0,
+        )
+        resp.raise_for_status()
+        root = ET.fromstring(resp.content)
+        for item in root.findall(".//item"):
+            def _t(tag: str) -> str:
+                el = item.find(tag)
+                return (el.text or "").strip() if el is not None else ""
+
+            raw_title = _t("title")
+            url = _t("link")
+            if not raw_title:
+                continue
+            parts = [p.strip() for p in raw_title.split(" - ")]
+            job_title = parts[0] if parts else raw_title
+            company = parts[1] if len(parts) > 1 else "Unknown"
+            results.append({
+                "position": job_title,
+                "company": company,
+                "url": url,
+                "tags": ["Calgary", "AB", "Job Bank Canada"],
+            })
+    except ET.ParseError as e:
+        results.append({"_error": f"Job Bank Canada: RSS parse error — {e}"})
+    except Exception as e:
+        results.append({"_error": f"Job Bank Canada: {e}"})
+    return results
+
+
+async def _fetch_job_bank_canada_async(client: httpx.AsyncClient) -> list[dict]:
+    """Runs all Job Bank search queries concurrently and deduplicates by URL."""
+    nested = await asyncio.gather(
+        *[_fetch_job_bank_one(client, params) for params in _JOB_BANK_SEARCHES]
+    )
     seen_urls: set[str] = set()
-
-    for params in _JOB_BANK_SEARCHES:
-        try:
-            resp = requests.get(
-                "https://www.jobbank.gc.ca/jobsearch/rss",
-                params={**params, "lang": "eng"},
-                headers=_HEADERS,
-                timeout=15,
-            )
-            resp.raise_for_status()
-
-            root = ET.fromstring(resp.content)
-            for item in root.findall(".//item"):
-                def _t(tag: str) -> str:
-                    el = item.find(tag)
-                    return (el.text or "").strip() if el is not None else ""
-
-                raw_title = _t("title")
-                url = _t("link")
-
-                if not raw_title or url in seen_urls:
-                    continue
+    results: list[dict] = []
+    for batch in nested:
+        for job in batch:
+            if "_error" in job:
+                results.append(job)
+                continue
+            url = job.get("url", "")
+            if url and url not in seen_urls:
                 seen_urls.add(url)
-
-                # Job Bank titles: "Software Developer - Acme Corp - Calgary, AB"
-                parts = [p.strip() for p in raw_title.split(" - ")]
-                job_title = parts[0] if parts else raw_title
-                company = parts[1] if len(parts) > 1 else "Unknown"
-
-                results.append({
-                    "position": job_title,
-                    "company": company,
-                    "url": url,
-                    "tags": ["Calgary", "AB", "Job Bank Canada"],
-                })
-
-        except ET.ParseError as e:
-            results.append({"_error": f"Job Bank Canada: RSS parse error — {e}"})
-        except Exception as e:
-            results.append({"_error": f"Job Bank Canada: {e}"})
-            break  # One network error covers both searches
-
+                results.append(job)
     return results or [{"_error": "Job Bank Canada: No results returned"}]
 
 
-def _fetch_weworkremotely() -> list[dict]:
-    """Fetches remote programming job postings from WeWork Remotely via RSS.
-
-    Covers full-time remote roles open worldwide or Canada-specific.
-    Title format in feed: "Company: Job Title" — parsed and split.
-    """
+async def _fetch_weworkremotely_async(client: httpx.AsyncClient) -> list[dict]:
     results: list[dict] = []
     seen: set[str] = set()
-
     try:
-        resp = requests.get(
+        resp = await client.get(
             "https://weworkremotely.com/categories/remote-programming-jobs.rss",
-            headers=_HEADERS,
-            timeout=15,
+            timeout=10.0,
         )
         resp.raise_for_status()
-
         root = ET.fromstring(resp.content)
         for item in root.findall(".//item"):
             def _t(tag: str) -> str:
@@ -287,46 +281,35 @@ def _fetch_weworkremotely() -> list[dict]:
             raw_title = _t("title")
             url       = _t("link")
             region    = _t("region")
-
             if not raw_title or url in seen:
                 continue
             seen.add(url)
-
-            # Feed titles are "Company: Job Title"
             if ": " in raw_title:
                 company, job_title = raw_title.split(": ", 1)
             else:
                 company, job_title = "See listing", raw_title
-
             results.append({
                 "position": job_title.strip(),
                 "company":  company.strip(),
                 "url":      url,
                 "tags":     ["Remote", region or "Worldwide", "WeWorkRemotely"],
             })
-
     except ET.ParseError as e:
         results.append({"_error": f"WeWorkRemotely: RSS parse error — {e}"})
     except Exception as e:
         results.append({"_error": f"WeWorkRemotely: {e}"})
-
     return results or [{"_error": "WeWorkRemotely: No results returned"}]
 
 
-def _fetch_eluta() -> list[dict]:
-    """Fetches Calgary software job postings from Eluta.ca (Canadian job aggregator).
-
-    Eluta.ca aggregates directly from employer career pages, so it surfaces roles
-    that never appear on LinkedIn or international boards. Individual job links use
-    client-side JavaScript routing, so the URL returned is the Eluta.ca search URL
-    for that query — clicking it lands on the live results page.
-    """
+async def _fetch_eluta_one(
+    client: httpx.AsyncClient, params: dict
+) -> list[dict]:
     results: list[dict] = []
-    seen: set[str] = set()
-
-    # Regex patterns to extract job data from server-rendered HTML
-    # Eluta renders anchor tags with job titles — href may be "#!" (JS-routed)
-    # but the text content is always in the HTML source.
+    search_url = (
+        f"https://www.eluta.ca/search"
+        f"?q={params['q'].replace(' ', '+')}"
+        f"&l={params['l'].replace(' ', '+').replace(',', '%2C')}"
+    )
     _title_re = re.compile(
         r'<a\b[^>]*href="[^"]*"[^>]*>\s*([A-Z][^<]{4,100}?)\s*</a>',
         re.IGNORECASE,
@@ -335,64 +318,93 @@ def _fetch_eluta() -> list[dict]:
         r'<a\b[^>]*title="See all jobs at ([^"]{2,80})"',
         re.IGNORECASE,
     )
-    # Fallback: bold/strong text that follows a job title line (often company name)
-    _company_fallback_re = re.compile(
-        r'<(?:b|strong)[^>]*>\s*([^<]{2,80})\s*</(?:b|strong)>',
-        re.IGNORECASE,
-    )
-    # Detect job-title-like text (contains a role keyword)
     _role_re = re.compile(
         r'\b(developer|engineer|analyst|programmer|designer|technician|'
         r'architect|administrator|specialist|coordinator|scientist)\b',
         re.IGNORECASE,
     )
-
-    for params in _ELUTA_SEARCHES:
-        search_url = (
-            f"https://www.eluta.ca/search"
-            f"?q={params['q'].replace(' ', '+')}"
-            f"&l={params['l'].replace(' ', '+').replace(',', '%2C')}"
+    try:
+        resp = await client.get(
+            "https://www.eluta.ca/search",
+            params={**params, "sort": "rank"},
+            timeout=10.0,
         )
-        try:
-            resp = requests.get(
-                "https://www.eluta.ca/search",
-                params={**params, "sort": "rank"},
-                headers=_ELUTA_HEADERS,
-                timeout=15,
-            )
-            resp.raise_for_status()
-            html = resp.text
+        resp.raise_for_status()
+        html = resp.text
+        companies = _company_re.findall(html)
+        all_anchors = _title_re.findall(html)
+        job_titles = [
+            t.strip() for t in all_anchors
+            if _role_re.search(t) and 8 < len(t.strip()) < 120
+        ]
+        for i, title in enumerate(job_titles):
+            company = companies[i] if i < len(companies) else "See listing"
+            results.append({
+                "position": title,
+                "company":  company,
+                "url":      search_url,
+                "tags":     ["Calgary", "AB", "Eluta.ca", "Canada"],
+            })
+    except Exception as e:
+        results.append({"_error": f"Eluta.ca ({params['q']}): {e}"})
+    return results
 
-            # Extract all company names via Eluta's consistent title attribute
-            companies = _company_re.findall(html)
 
-            # Extract all anchor text that looks like a job title
-            all_anchors = _title_re.findall(html)
-            job_titles = [
-                t.strip() for t in all_anchors
-                if _role_re.search(t) and 8 < len(t.strip()) < 120
-            ]
-
-            # Pair titles with companies — they appear in the same order on page
-            for i, title in enumerate(job_titles):
-                dedup = title.lower()
-                if dedup in seen:
-                    continue
+async def _fetch_eluta_async(client: httpx.AsyncClient) -> list[dict]:
+    """Runs all Eluta search queries concurrently and deduplicates by title."""
+    nested = await asyncio.gather(
+        *[_fetch_eluta_one(client, params) for params in _ELUTA_SEARCHES]
+    )
+    seen: set[str] = set()
+    results: list[dict] = []
+    for batch in nested:
+        for job in batch:
+            if "_error" in job:
+                results.append(job)
+                continue
+            dedup = job.get("position", "").lower()
+            if dedup and dedup not in seen:
                 seen.add(dedup)
-
-                company = companies[i] if i < len(companies) else "See listing"
-
-                results.append({
-                    "position": title,
-                    "company":  company,
-                    "url":      search_url,
-                    "tags":     ["Calgary", "AB", "Eluta.ca", "Canada"],
-                })
-
-        except Exception as e:
-            results.append({"_error": f"Eluta.ca ({params['q']}): {e}"})
-
+                results.append(job)
     return results or [{"_error": "Eluta.ca: No results returned"}]
+
+
+def _run_async(coro):
+    """Run a coroutine safely whether or not an event loop is already running."""
+    try:
+        asyncio.get_running_loop()
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            return pool.submit(asyncio.run, coro).result()
+    except RuntimeError:
+        return asyncio.run(coro)
+
+
+async def _fetch_all_sources() -> list[tuple[str, list[dict]]]:
+    """Fetches all five job board sources concurrently."""
+    async with httpx.AsyncClient(
+        follow_redirects=True,
+        headers=_HEADERS,
+    ) as client:
+        eluta_client = httpx.AsyncClient(
+            follow_redirects=True,
+            headers=_ELUTA_HEADERS,
+        )
+        async with eluta_client:
+            results = await asyncio.gather(
+                _fetch_remoteok_async(client),
+                _fetch_arbeitnow_async(client),
+                _fetch_job_bank_canada_async(client),
+                _fetch_eluta_async(eluta_client),
+                _fetch_weworkremotely_async(client),
+            )
+    return [
+        ("RemoteOK",        results[0]),
+        ("Arbeitnow",       results[1]),
+        ("Job Bank Canada", results[2]),
+        ("Eluta.ca",        results[3]),
+        ("WeWorkRemotely",  results[4]),
+    ]
 
 
 def _format_job(source: str, title: str, company: str, tags: str, url: str, scam_risk: str = "CLEAR") -> str:
@@ -425,13 +437,7 @@ def fetch_job_board_postings(max_results: int = 60) -> str:
         Scored and labelled job listings grouped by verdict, with source,
         tags, and direct URLs, plus a career support resources block.
     """
-    sources = [
-        ("RemoteOK",          _fetch_remoteok()),
-        ("Arbeitnow",         _fetch_arbeitnow()),
-        ("Job Bank Canada",   _fetch_job_bank_canada()),
-        ("Eluta.ca",          _fetch_eluta()),
-        ("WeWorkRemotely",    _fetch_weworkremotely()),
-    ]
+    sources = _run_async(_fetch_all_sources())
 
     buckets: dict[str, list[str]] = {p: [] for p in _PRIORITY_ORDER}
     errors: list[str] = []

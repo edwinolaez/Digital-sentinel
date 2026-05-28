@@ -1,0 +1,70 @@
+============================================================
+APPLICATION DRAFT
+Company  : Jusbrasil
+Role     : Junior Legal Data Analyst
+Date     : 2026-05-03
+URL      : https://remoteOK.com/remote-jobs/remote-legal-data-analyst-junior-vaga-afirmativa-para-pcd-jusbrasil-1131393
+============================================================
+
+FULL RESUME
+------------------------------------------------------------
+───────────────────────────────────────
+Edwin Olaez
+Calgary, AB | edwinolaez@yahoo.com
+
+Junior Legal Data Analyst
+
+PROFESSIONAL SUMMARY
+Highly motivated Junior Software Developer with a strong foundation in Python, AI, and data-intensive system architecture, eager to transition into a Legal Data Analyst role at an AI-first company. Proven ability to build multi-agent AI systems, process massive datasets in real-time, and engineer cutting-edge solutions for complex problems, aiming to leverage technical acumen to transform legal data into actionable insights.
+
+HIGHLIGHTS OF QUALIFICATIONS
+• Diploma in Software Development, Southern Alberta Institute of Technology (SAIT), graduating Aug 2026
+• Proficient in Python, with hands-on experience in Generative AI (Gemini 2.5 Flash) and Google ADK
+• Demonstrated ability to design and implement systems for massive data ingestion and real-time processing
+• Strong problem-solving and analytical skills applied in developing complex multi-agent AI solutions
+• Experience with REST APIs, SQL databases, and full-stack development using React and Node.js/Flask/FastAPI
+• Committed to continuous learning and applying cutting-edge engineering practices to achieve impactful results
+
+SKILLS
+Python | Generative AI | Google ADK | Gemini 2.5 Flash | Multi-agent Systems | Data Ingestion | Real-time Data Processing | REST APIs | SQL | React | Node.js | Flask | FastAPI | TypeScript | JavaScript | HTML | CSS | Git | GitHub | Problem-solving | Analytical Thinking | Scalable Systems
+
+RELEVANT EXPERIENCE
+
+AI & Data Systems Development
+• Architected and developed a 5-agent Python system using Google ADK and Gemini 2.5 Flash for the Digital Sentinel, enabling AI-driven data ingestion and analysis from diverse sources (email, GitHub, job boards).
+• Implemented real-time scam detection within the Digital Sentinel, processing and analyzing job posting and URL data to identify and flag suspicious content, enhancing data integrity and user safety.
+• Engineered token usage tracking and cost estimation features for AI services within Digital Sentinel, providing data-driven insights into resource consumption for efficient operational management.
+• Designed and implemented a Python-based REST API backend for the Wildfire Intelligence Crew, facilitating real-time ingestion and processing of massive satellite data feeds for global fire monitoring and alerting, demonstrating scalable data handling.
+• Developed a frontend dashboard for the Wildfire Intelligence Crew to visualize real-time fire data and alerts, improving situational awareness and response capabilities.
+
+Software Engineering & Full-Stack Development
+• Built a Next.js/React dashboard for monitoring applications, focusing on intuitive UI/UX to enhance user experience.
+• Developed server-side logic and APIs using Node.js and Flask/FastAPI, integrating with SQL and MongoDB databases for robust data management.
+• Contributed to a real-time command and control system (CAF C2) using Python, MAVLink, and React, demonstrating expertise in network protocols and responsive frontend development.
+
+WORK HISTORY
+(No formal work history yet, as Edwin is seeking his first role.)
+
+EDUCATION
+Diploma in Software Development 2026
+Southern Alberta Institute of Technology (SAIT), Calgary, AB
+
+PROFESSIONAL AFFILIATIONS
+(Omit section if empty.)
+
+INTERESTS
+AI/ML, multi-agent systems, full-stack web development, open source
+
+───────────────────────────────────────
+
+COVER LETTER
+------------------------------------------------------------
+Dear Jusbrasil Hiring Team,
+
+I am writing to express my keen interest in the Junior Legal Data Analyst position at Jusbrasil, as advertised on RemoteOK. I am particularly drawn to Jusbrasil’s mission to transform the justice system with technology and your commitment to being an AI-first company. The opportunity to leverage generative AI and massive datasets to solve complex problems in a domain with significant societal impact deeply resonates with my career aspirations.
+
+My background, though primarily in software development, has equipped me with strong transferable skills directly relevant to your needs. My "Digital Sentinel" project showcases my ability to architect and implement multi-agent AI systems using Google ADK and Gemini 2.5 Flash, which actively ingests and analyzes diverse data sources. This experience in developing intelligent systems for data processing and analysis aligns directly with your focus on Generative AI and handling massive data to create real impact.
+
+I am confident that my technical proficiency in Python, AI, and scalable data systems, combined with my enthusiasm for learning new domains, makes me an ideal candidate for this role. I am eager to contribute to Jusbrasil's innovative approach and further develop my analytical skills within the legal technology sector. Thank you for your time and consideration.
+
+============================================================

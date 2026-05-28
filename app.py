@@ -4,6 +4,7 @@ Run with: python app.py  (from the digital-sentinel/ directory)
 Serves at: http://127.0.0.1:7860
 """
 import asyncio
+import json
 import os
 
 import gradio as gr
@@ -130,6 +131,127 @@ def _delete_draft(filename: str) -> tuple[gr.Dropdown, str]:
     newest = files[0] if files else None
     content = _load_draft(newest) if newest else "No drafts saved yet."
     return gr.Dropdown(choices=files, value=newest), content
+
+
+# ── ATS Scanner ───────────────────────────────────────────────────────────────
+
+_ATS_SYSTEM_PROMPT = (
+    "You are an ATS (Applicant Tracking System) analyser. Given a resume and a job "
+    "description, return ONLY a JSON object — no markdown fences, no preamble. "
+    "The JSON must have exactly these keys: "
+    "match_score (integer 0-100), "
+    "verdict (string, one sentence), "
+    "keywords_found (list of strings), "
+    "keywords_missing (list of strings), "
+    "keywords_partial (list of strings — present but not prominent), "
+    "structural_issues (list of strings), "
+    "top_recommendation (string, one actionable sentence)"
+)
+
+
+def _ats_score_color(score: int) -> str:
+    if score >= 80:
+        return "#16a34a"   # green
+    if score >= 60:
+        return "#d97706"   # amber
+    return "#dc2626"       # red
+
+
+def _render_ats_results(data: dict) -> str:
+    score = int(data.get("match_score", 0))
+    color = _ats_score_color(score)
+    verdict = data.get("verdict", "")
+    found = data.get("keywords_found", [])
+    missing = data.get("keywords_missing", [])
+    partial = data.get("keywords_partial", [])
+    issues = data.get("structural_issues", [])
+    rec = data.get("top_recommendation", "")
+
+    def badges(items: list, cls: str) -> str:
+        return " ".join(
+            f'<span class="ats-badge {cls}" style="display:inline-block;'
+            f'padding:2px 10px;border-radius:12px;font-size:.8rem;margin:2px;">'
+            f'{item}</span>'
+            for item in items
+        )
+
+    issues_html = (
+        "<ul style='margin:4px 0 0 18px;padding:0;'>"
+        + "".join(f"<li style='font-size:.87rem;margin:2px 0;'>{i}</li>" for i in issues)
+        + "</ul>"
+    ) if issues else "<span style='font-size:.87rem;color:#64748b;'>None found</span>"
+
+    return f"""
+<div style="font-family:'Segoe UI',system-ui,sans-serif;padding:16px;">
+  <div style="display:flex;align-items:center;gap:20px;margin-bottom:16px;">
+    <div style="width:80px;height:80px;border-radius:50%;border:5px solid {color};
+                display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+      <span style="font-size:1.5rem;font-weight:700;color:{color};">{score}</span>
+    </div>
+    <div>
+      <div style="height:14px;background:#e2e8f0;border-radius:7px;width:260px;overflow:hidden;">
+        <div style="height:100%;width:{score}%;background:{color};border-radius:7px;"></div>
+      </div>
+      <p style="margin:8px 0 0;font-size:.95rem;color:#1a202c;">{verdict}</p>
+    </div>
+  </div>
+
+  <div style="margin-bottom:12px;">
+    <strong style="font-size:.85rem;color:#16a34a;">Keywords Found</strong><br>
+    {badges(found, "ats-hit") if found else "<span style='font-size:.82rem;color:#64748b;'>None</span>"}
+  </div>
+  <div style="margin-bottom:12px;">
+    <strong style="font-size:.85rem;color:#dc2626;">Keywords Missing</strong><br>
+    {badges(missing, "ats-miss") if missing else "<span style='font-size:.82rem;color:#64748b;'>None</span>"}
+  </div>
+  <div style="margin-bottom:12px;">
+    <strong style="font-size:.85rem;color:#d97706;">Keywords Partial</strong><br>
+    {badges(partial, "ats-partial") if partial else "<span style='font-size:.82rem;color:#64748b;'>None</span>"}
+  </div>
+
+  <div style="margin-bottom:12px;">
+    <strong style="font-size:.85rem;color:#1a202c;">Structural Issues</strong>
+    {issues_html}
+  </div>
+
+  <div style="background:#f0f4ff;border:1px solid #c7d7f8;border-radius:8px;padding:12px;margin-top:8px;">
+    <strong style="font-size:.85rem;color:#3b82f6;">Top Recommendation</strong>
+    <p style="margin:6px 0 0;font-size:.9rem;color:#1a202c;">{rec}</p>
+  </div>
+</div>
+"""
+
+
+async def run_ats_scan(resume_text: str, job_text: str) -> str:
+    if not resume_text.strip() or not job_text.strip():
+        return '<p style="color:#dc2626;padding:12px;">Please paste both your resume and the job posting.</p>'
+
+    try:
+        import google.genai as genai
+        client = genai.Client(api_key=os.environ.get("GOOGLE_API_KEY", ""))
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=f"RESUME:\n{resume_text}\n\nJOB POSTING:\n{job_text}",
+            config=genai_types.GenerateContentConfig(
+                system_instruction=_ATS_SYSTEM_PROMPT,
+            ),
+        )
+        raw = response.text.strip()
+        # Strip markdown fences if model adds them despite instructions
+        if raw.startswith("```"):
+            raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
+        if raw.endswith("```"):
+            raw = raw.rsplit("```", 1)[0]
+        data = json.loads(raw.strip())
+        return _render_ats_results(data)
+    except json.JSONDecodeError:
+        return (
+            f'<p style="color:#dc2626;padding:12px;">Could not parse JSON response.</p>'
+            f'<pre style="font-size:.8rem;white-space:pre-wrap;padding:12px;">{raw}</pre>'
+        )
+    except Exception as e:
+        return f'<p style="color:#dc2626;padding:12px;">[ATS Error] {e}</p>'
+
 
 # ── CSS ───────────────────────────────────────────────────────────────────────
 
@@ -374,6 +496,39 @@ body, .gradio-container {
     height: 36px !important;
 }
 #delete-draft-btn:hover { background: #b91c1c !important; }
+
+/* ── ATS Scanner tab ── */
+#ats-resume-input textarea,
+#ats-job-input textarea {
+    background: #ffffff !important;
+    color: #1a202c !important;
+    border: 1px solid #dde3ec !important;
+    border-radius: 8px !important;
+    font-family: 'Consolas','Courier New',monospace !important;
+    font-size: .82rem !important;
+    line-height: 1.55 !important;
+    padding: 9px 12px !important;
+}
+#ats-resume-input textarea:focus,
+#ats-job-input textarea:focus { border-color: #3b82f6 !important; outline: none !important; }
+#ats-scan-btn {
+    background: #7c3aed !important;
+    color: #fff !important;
+    border: none !important;
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+    height: 44px !important;
+}
+#ats-scan-btn:hover { background: #6d28d9 !important; }
+#ats-results {
+    background: #ffffff;
+    border: 1px solid #dde3ec;
+    border-radius: 8px;
+    min-height: 80px;
+}
+.ats-badge.ats-hit     { background: #dcfce7; color: #166534; }
+.ats-badge.ats-miss    { background: #fee2e2; color: #991b1b; }
+.ats-badge.ats-partial { background: #fef9c3; color: #854d0e; }
 """
 
 JS_TOGGLE = """
@@ -466,6 +621,37 @@ const DARK_CSS = `
   #theme-btn { background: #475569 !important; }
   .message-wrap, .wrap { background: #1e293b !important; }
   ::-webkit-scrollbar-thumb { background: #475569 !important; }
+
+  /* ── Tab navigation — dark mode ── */
+  .tab-nav, .tabs .tab-nav {
+    background: #1e293b !important;
+    border-color: #334155 !important;
+  }
+  .tab-nav button, .tabs .tab-nav button, button[role="tab"] {
+    color: #94a3b8 !important;
+    background: transparent !important;
+    border-color: transparent !important;
+  }
+  .tab-nav button.selected,
+  .tabs .tab-nav button.selected,
+  button[role="tab"][aria-selected="true"] {
+    color: #f1f5f9 !important;
+    background: #0f172a !important;
+    border-bottom-color: #3b82f6 !important;
+    font-weight: 700 !important;
+  }
+  .tab-nav button:hover, button[role="tab"]:hover {
+    color: #e2e8f0 !important;
+    background: #253347 !important;
+  }
+
+  /* ── ATS Scanner tab — dark mode ── */
+  #ats-resume-input textarea,
+  #ats-job-input textarea { background: #0f172a !important; color: #f1f5f9 !important; border-color: #334155 !important; }
+  #ats-results { background: #1e293b !important; color: #f1f5f9 !important; border-color: #334155 !important; }
+  .ats-badge.ats-hit     { background: #14532d !important; color: #bbf7d0 !important; }
+  .ats-badge.ats-miss    { background: #7f1d1d !important; color: #fecaca !important; }
+  .ats-badge.ats-partial { background: #713f12 !important; color: #fef08a !important; }
 `;
 
 function applyDark() {
@@ -505,7 +691,7 @@ function toggleTheme() {
 def build_ui() -> gr.Blocks:
     with gr.Blocks(title="Digital Sentinel") as demo:
 
-        # Header
+        # Header (outside tabs — always visible)
         gr.HTML("""
         <div id="ds-header">
             <div>
@@ -516,98 +702,133 @@ def build_ui() -> gr.Blocks:
         </div>
         """)
 
-        # Status bar
-        gr.HTML("""
-        <div id="ds-status">
-            <span class="dot"></span>
-            Running locally &nbsp;·&nbsp; Google ADK 1.29 &nbsp;·&nbsp; All agents ready
-        </div>
-        """)
+        with gr.Tabs():
 
-        # Quick command buttons — store refs in a list
-        quick_btns: list[gr.Button] = []
-        with gr.Row(elem_id="ds-quick"):
-            for label, _ in QUICK_COMMANDS:
-                b = gr.Button(label, elem_classes=["qbtn"], size="sm")
-                quick_btns.append(b)
+            # ── Tab 1: Chat ───────────────────────────────────────────────────
+            with gr.Tab("Chat"):
 
-        # Chatbot — Gradio 6.12 uses MessageDict format natively
-        chatbot = gr.Chatbot(
-            value=[],
-            elem_id="chatbox",
-            show_label=False,
-            height=460,
-        )
+                # Status bar
+                gr.HTML("""
+                <div id="ds-status">
+                    <span class="dot"></span>
+                    Running locally &nbsp;·&nbsp; Google ADK 1.29 &nbsp;·&nbsp; All agents ready
+                </div>
+                """)
 
-        # Input row
-        with gr.Row(elem_id="ds-input-row"):
-            msg_box = gr.Textbox(
-                placeholder='Type a message and press Enter — or say "help" to start',
-                show_label=False,
-                lines=1,
-                max_lines=5,
-                elem_id="ds-textbox",
-                scale=9,
-                autofocus=True,
-            )
-            send_btn = gr.Button("Send", elem_id="ds-send", scale=1, variant="primary")
+                # Quick command buttons
+                quick_btns: list[gr.Button] = []
+                with gr.Row(elem_id="ds-quick"):
+                    for label, _ in QUICK_COMMANDS:
+                        b = gr.Button(label, elem_classes=["qbtn"], size="sm")
+                        quick_btns.append(b)
 
-        # Resume & Cover Letter panel
-        with gr.Row(elem_id="resume-panel"):
-            with gr.Column(scale=9):
-                gr.HTML('<div id="resume-panel-label">Resume &amp; Cover Letter Generator — paste a job URL or description below</div>')
-                resume_job_input = gr.Textbox(
-                    placeholder="https://example.com/job/123  — or paste the full job description here",
+                # Chatbot
+                chatbot = gr.Chatbot(
+                    value=[],
+                    elem_id="chatbox",
                     show_label=False,
-                    lines=2,
-                    max_lines=8,
-                    elem_id="resume-job-input",
+                    height=460,
                 )
-            with gr.Column(scale=1, min_width=190):
-                resume_gen_btn = gr.Button(
-                    "Generate Resume & Cover Letter",
-                    elem_id="resume-gen-btn",
+
+                # Input row
+                with gr.Row(elem_id="ds-input-row"):
+                    msg_box = gr.Textbox(
+                        placeholder='Type a message and press Enter — or say "help" to start',
+                        show_label=False,
+                        lines=1,
+                        max_lines=5,
+                        elem_id="ds-textbox",
+                        scale=9,
+                        autofocus=True,
+                    )
+                    send_btn = gr.Button("Send", elem_id="ds-send", scale=1, variant="primary")
+
+                # Resume & Cover Letter panel
+                with gr.Row(elem_id="resume-panel"):
+                    with gr.Column(scale=9):
+                        gr.HTML('<div id="resume-panel-label">Resume &amp; Cover Letter Generator — paste a job URL or description below</div>')
+                        resume_job_input = gr.Textbox(
+                            placeholder="https://example.com/job/123  — or paste the full job description here",
+                            show_label=False,
+                            lines=2,
+                            max_lines=8,
+                            elem_id="resume-job-input",
+                        )
+                    with gr.Column(scale=1, min_width=190):
+                        resume_gen_btn = gr.Button(
+                            "Generate Resume & Cover Letter",
+                            elem_id="resume-gen-btn",
+                            variant="primary",
+                        )
+                        drafts_btn = gr.Button(
+                            "View Saved Drafts",
+                            elem_id="drafts-btn",
+                            variant="secondary",
+                        )
+
+                # Saved Drafts viewer panel
+                initial_files = _draft_files()
+                initial_newest = initial_files[0] if initial_files else None
+                with gr.Row(elem_id="drafts-viewer-panel"):
+                    with gr.Column():
+                        gr.HTML('<div id="drafts-viewer-label">Saved Application Drafts</div>')
+                        with gr.Row():
+                            drafts_dropdown = gr.Dropdown(
+                                choices=initial_files,
+                                value=initial_newest,
+                                show_label=False,
+                                elem_id="drafts-dropdown",
+                                scale=9,
+                            )
+                            refresh_btn = gr.Button(
+                                "Refresh",
+                                elem_id="refresh-btn",
+                                scale=1,
+                                min_width=80,
+                            )
+                            delete_draft_btn = gr.Button(
+                                "Delete",
+                                elem_id="delete-draft-btn",
+                                scale=1,
+                                min_width=80,
+                            )
+                        drafts_content = gr.Textbox(
+                            value=_load_draft(initial_newest) if initial_newest else "No drafts saved yet.",
+                            show_label=False,
+                            lines=14,
+                            max_lines=30,
+                            interactive=False,
+                            elem_id="drafts-content",
+                        )
+
+            # ── Tab 2: ATS Scanner ────────────────────────────────────────────
+            with gr.Tab("ATS Scanner"):
+
+                with gr.Row():
+                    with gr.Column():
+                        resume_input = gr.Textbox(
+                            label="Your Resume",
+                            lines=20,
+                            placeholder="Paste your resume text here...",
+                            elem_id="ats-resume-input",
+                        )
+                    with gr.Column():
+                        job_input = gr.Textbox(
+                            label="Job Posting",
+                            lines=20,
+                            placeholder="Paste the job description here...",
+                            elem_id="ats-job-input",
+                        )
+
+                ats_scan_btn = gr.Button(
+                    "Scan with ATS Analyzer",
+                    elem_id="ats-scan-btn",
                     variant="primary",
                 )
-                drafts_btn = gr.Button(
-                    "View Saved Drafts",
-                    elem_id="drafts-btn",
-                    variant="secondary",
-                )
 
-        # Saved Drafts viewer panel
-        initial_files = _draft_files()
-        initial_newest = initial_files[0] if initial_files else None
-        with gr.Row(elem_id="drafts-viewer-panel"):
-            with gr.Column():
-                gr.HTML('<div id="drafts-viewer-label">Saved Application Drafts</div>')
-                with gr.Row():
-                    drafts_dropdown = gr.Dropdown(
-                        choices=initial_files,
-                        value=initial_newest,
-                        show_label=False,
-                        elem_id="drafts-dropdown",
-                        scale=9,
-                    )
-                    refresh_btn = gr.Button(
-                        "Refresh",
-                        elem_id="refresh-btn",
-                        scale=1,
-                        min_width=80,
-                    )
-                    delete_draft_btn = gr.Button(
-                        "Delete",
-                        elem_id="delete-draft-btn",
-                        scale=1,
-                        min_width=80,
-                    )
-                drafts_content = gr.Textbox(
-                    value=_load_draft(initial_newest) if initial_newest else "No drafts saved yet.",
-                    show_label=False,
-                    lines=14,
-                    max_lines=30,
-                    interactive=False,
-                    elem_id="drafts-content",
+                ats_results = gr.HTML(
+                    value="",
+                    elem_id="ats-results",
                 )
 
         # ── Wire events ───────────────────────────────────────────────────────
@@ -662,6 +883,13 @@ def build_ui() -> gr.Blocks:
             fn=_delete_draft,
             inputs=[drafts_dropdown],
             outputs=[drafts_dropdown, drafts_content],
+        )
+
+        # ATS Scanner: run scan on button click
+        ats_scan_btn.click(
+            fn=run_ats_scan,
+            inputs=[resume_input, job_input],
+            outputs=[ats_results],
         )
 
     return demo
