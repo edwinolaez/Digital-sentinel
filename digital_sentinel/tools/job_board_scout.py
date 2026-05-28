@@ -7,7 +7,7 @@ Every posting is scanned for scam signals before being surfaced.
 """
 import asyncio
 import re
-import xml.etree.ElementTree as ET
+import defusedxml.ElementTree as ET
 
 import httpx
 
