@@ -169,6 +169,21 @@ Opens automatically at **http://127.0.0.1:7860**
 
 **Desktop shortcut** — double-click `Digital Sentinel` on your desktop. The server starts in a hidden window and your browser opens automatically. To stop it, open Task Manager and end the `python.exe` process.
 
+### 5. Access from your phone or tablet
+
+The server binds to `0.0.0.0`, so any device on the same Wi-Fi network can reach it.
+
+1. Start the app on your PC as usual (`python app.py`)
+2. On your phone's browser, navigate to:
+
+```
+http://192.168.13.1:7860
+```
+
+> If that address doesn't load, try `http://10.187.185.138:7860`. Your PC's LAN IP can change — run `ipconfig` on your PC to find the current one if needed.
+
+**Tip:** Add it to your home screen for an app-like shortcut — on iOS tap Share → *Add to Home Screen*; on Android tap ⋮ → *Add to Home Screen*.
+
 ---
 
 ## Command Reference
