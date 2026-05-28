@@ -30,9 +30,16 @@ digital-sentinel/
 ├── app.py                          ← Custom Gradio UI (replaces adk web)
 ├── launch.bat                      ← Terminal launcher (dev use)
 ├── launch.vbs                      ← Silent launcher for desktop shortcut
+├── pytest.ini                      ← Test discovery config
+├── requirements.txt                ← Runtime dependencies (pinned)
+├── requirements-dev.txt            ← Dev/test dependencies (pytest, bandit, pip-audit)
 ├── profile.json                    ← Your profile (auto-created, git-ignored)
 ├── career_url_overrides.json       ← URL corrections (auto-generated, git-ignored)
 ├── safety_auditor.py               ← Standalone repo auditor
+├── tests/
+│   ├── test_scam_detector.py       ← 22 tests
+│   ├── test_url_healer.py          ← 18 tests
+│   └── test_profile_manager.py     ← 32 tests
 └── digital_sentinel/
     ├── agent.py                    ← All 10 agents defined here
     └── tools/
@@ -254,6 +261,40 @@ MISSION 8 — COLD OUTREACH
 
 ---
 
+## Testing
+
+### Run the test suite
+
+```powershell
+.sentinel_env\Scripts\pytest.exe -v
+```
+
+72 tests across 3 modules — no network calls, no file system side effects (all I/O is patched to `tmp_path`).
+
+| Test file | What it covers |
+|-----------|---------------|
+| `tests/test_scam_detector.py` | URL safety checks, scam signal scanning, report formatting |
+| `tests/test_url_healer.py` | Slug generation, override CRUD, broken URL detection |
+| `tests/test_profile_manager.py` | All 7 profile functions — get, set, list add/remove, project CRUD |
+
+### Run the security scan
+
+```powershell
+.sentinel_env\Scripts\bandit.exe -r digital_sentinel/ -f screen
+```
+
+Scans all source files with [Bandit](https://bandit.readthedocs.io). Current status: **0 Medium/High issues**. The one remaining Low finding (`try/except/pass` in the usage tracker) is intentional — usage tracking must never crash an agent.
+
+### Install dev dependencies
+
+```powershell
+pip install -r requirements-dev.txt
+```
+
+Includes `pytest`, `bandit`, and `pip-audit` on top of the runtime requirements.
+
+---
+
 ## Security Model
 
 | Surface | Protection |
@@ -264,6 +305,7 @@ MISSION 8 — COLD OUTREACH
 | GitHub repos | Clone Guard audit on request; trend picks auto-audited |
 | Resume job URLs | URL safety check before fetch — SUSPICIOUS domains blocked |
 | Career page URLs | Auto-healed when broken — overrides saved without code changes |
+| RSS XML parsing | `defusedxml` used instead of stdlib `xml.etree` — prevents XML bomb attacks |
 
 ---
 
