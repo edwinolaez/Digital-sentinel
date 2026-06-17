@@ -142,54 +142,87 @@ No markdown fences, no preamble, no trailing commentary — raw JSON only.
 
 The JSON must have exactly these keys:
 
-match_score       — integer 0-100. Weight: 40% keywords, 25% experience/qualifications,
-                    20% bullet quality, 15% structure.
+match_score        — integer 0-100. Weight: 30% keywords, 20% experience/qualifications,
+                     20% searchability, 15% bullet quality, 15% structure/tone.
 
-verdict           — string. One sentence summarising the overall fit honestly.
+verdict            — string. One sentence summarising the overall fit honestly.
 
-keywords_found    — list of strings. Exact keywords/phrases from the job posting
-                    that appear on the resume.
+keywords_found     — list of strings. Exact keywords/phrases from the job posting
+                     that appear on the resume.
 
-keywords_missing  — list of strings. Exact keywords/phrases from the job posting
-                    completely absent from the resume.
+keywords_missing   — list of strings. Exact keywords/phrases from the job posting
+                     completely absent from the resume.
 
-keywords_partial  — list of strings. Keywords present but not prominent — mentioned
-                    once, buried in a paragraph, or absent from skills/summary sections.
+keywords_partial   — list of strings. Keywords present but not prominent — mentioned
+                     once, buried in a paragraph, or absent from skills/summary sections.
 
-structural_issues — list of strings. Resume format/structure problems such as:
-                    missing skills section, no measurable results in bullets,
-                    inconsistent dates, absent summary, poor section ordering.
+skill_frequency    — list of objects for the top 8 skills present in either document.
+                     Each object: skill (string), resume_count (integer — occurrences
+                     in resume), jd_count (integer — occurrences in job description).
+                     Sort by jd_count descending. Include skills with count 0 in one
+                     document if they appear in the other.
+                     Example: [{"skill":"React","resume_count":3,"jd_count":2},
+                                {"skill":"TypeScript","resume_count":1,"jd_count":4}]
 
-experience_gap    — string. One sentence comparing what the job requires (years,
-                    level) vs. what the resume shows.
-                    Example: "Role requires 3+ years; resume shows ~1 year via
-                    academic projects and one internship."
+contact_info       — object. Scan the resume for presence of each item:
+                     has_email (bool), has_phone (bool), has_address (bool),
+                     has_linkedin (bool), has_github (bool), has_portfolio (bool),
+                     issues (list of strings — one line per missing item with advice).
+                     Example: {"has_email":true,"has_phone":true,"has_address":true,
+                     "has_linkedin":false,"has_github":false,"has_portfolio":false,
+                     "issues":["No LinkedIn URL — add linkedin.com/in/yourname to header",
+                               "No GitHub URL — important for dev roles"]}
 
-seniority_fit     — string. Exactly one of these labels followed by a brief reason:
-                    "Strong match", "Slight under-qualification",
-                    "Significant under-qualification", "Over-qualified".
-                    Example: "Slight under-qualification — role targets mid-level
-                    but candidate is entry-level with strong project experience."
+job_title_match    — object. Check if the job title from the posting appears anywhere
+                     on the resume (summary, headline, or work history).
+                     matched (bool), job_title (string — title from job description),
+                     note (string — one sentence).
+                     Example: {"matched":false,"job_title":"Software Developer",
+                     "note":"Add 'Software Developer' to your resume summary or headline."}
 
-dealbreakers      — list of strings. Must-have requirements from the job posting
-                    that are completely missing from the resume and would likely
-                    cause automatic rejection. Be specific — quote the requirement.
-                    Empty list if none.
-                    Example: ["AWS required — no cloud experience on resume",
-                               "3+ years Python — candidate shows ~1 year"]
+date_format_issues — list of strings. Work history dates that don't follow ATS-preferred
+                     formats (MM/YYYY, Month YYYY, or Mon YYYY). Quote the problem and
+                     suggest the fix. Empty list if all dates are formatted correctly.
+                     Example: ["'Summer 2022' → use 'Jun 2022' or 'June 2022'",
+                               "'2021-2022' → use 'Jan 2021 – Dec 2022'"]
+
+word_count         — object. Count words in the RESUME only (not the job description).
+                     count (integer), assessment (string — one sentence).
+                     Target: 400–600 entry-level, 600–1000 experienced.
+                     Example: {"count":590,
+                     "assessment":"Slightly under target — aim for 650+ words to
+                     improve keyword density."}
+
+tone_issues        — list of strings. Clichés, buzzwords, or weak filler phrases
+                     found in the resume. Quote the phrase and explain why it's weak.
+                     Empty list if tone is clean.
+                     Example: ["'Passionate about technology' — generic, replace with
+                     a specific achievement",
+                               "'Results-driven' — unsubstantiated, show a metric instead",
+                               "'Team player' — vague, describe a specific collaboration"]
+
+structural_issues  — list of strings. Resume format/structure problems: missing skills
+                     section, no measurable results, inconsistent dates, absent summary,
+                     poor section ordering.
+
+experience_gap     — string. One sentence comparing what the job requires (years, level)
+                     vs. what the resume shows.
+                     Example: "Role requires 3+ years; resume shows ~1 year via academic
+                     projects and one internship."
+
+seniority_fit      — string. Exactly one of these labels followed by a brief reason:
+                     "Strong match", "Slight under-qualification",
+                     "Significant under-qualification", "Over-qualified".
+
+dealbreakers       — list of strings. Must-have requirements completely missing from the
+                     resume that would likely cause automatic rejection. Quote the
+                     requirement. Empty list if none.
 
 qualification_gaps — list of strings. Specific gaps beyond keywords: certifications,
-                    tools, methodologies, domain knowledge. State the gap and why
-                    it matters.
-                    Example: ["No CI/CD pipeline experience — job lists GitHub
-                    Actions as required", "No mention of Agile/Scrum — team uses
-                    sprint-based delivery"]
+                     tools, methodologies, domain knowledge, and why each matters.
 
-weak_bullets      — list of strings. 2-4 specific resume bullets that are vague or
-                    lack measurable outcomes. Quote the bullet then note what is weak.
-                    Example: ["'Worked on frontend features' — no metric, no outcome,
-                    too vague", "'Helped with database design' — passive verb,
-                    no result stated"]
+weak_bullets       — list of strings. 2-4 resume bullets that are vague or lack
+                     measurable outcomes. Quote the bullet then note what is weak.
 
 top_recommendation — string. The single most impactful change to make right now.
                      One actionable sentence.
@@ -213,6 +246,7 @@ def _seniority_color(label: str) -> str:
 
 
 def _render_ats_results(data: dict) -> str:
+    # ── Existing fields ──────────────────────────────────────────────────────
     score        = int(data.get("match_score", 0))
     color        = _ats_score_color(score)
     verdict      = data.get("verdict", "")
@@ -227,6 +261,15 @@ def _render_ats_results(data: dict) -> str:
     qual_gaps    = data.get("qualification_gaps", [])
     weak_bullets = data.get("weak_bullets", [])
 
+    # ── New fields ───────────────────────────────────────────────────────────
+    contact     = data.get("contact_info", {})
+    jt_match    = data.get("job_title_match", {})
+    date_issues = data.get("date_format_issues", [])
+    wc          = data.get("word_count", {})
+    tone        = data.get("tone_issues", [])
+    skill_freq  = data.get("skill_frequency", [])
+
+    # ── Helpers ──────────────────────────────────────────────────────────────
     def badges(items: list, cls: str) -> str:
         return " ".join(
             f'<span class="ats-badge {cls}" style="display:inline-block;'
@@ -235,18 +278,16 @@ def _render_ats_results(data: dict) -> str:
             for item in items
         )
 
-    def ul(items: list, color: str = "#1a202c") -> str:
+    def ul(items: list, col: str = "#1a202c") -> str:
         return (
             "<ul style='margin:4px 0 0 18px;padding:0;'>"
-            + "".join(
-                f"<li style='font-size:.87rem;margin:3px 0;color:{color};'>{i}</li>"
-                for i in items
-            )
+            + "".join(f"<li style='font-size:.87rem;margin:3px 0;color:{col};'>{i}</li>" for i in items)
             + "</ul>"
-        ) if items else f"<span style='font-size:.82rem;color:#64748b;'>None</span>"
+        ) if items else "<span style='font-size:.82rem;color:#64748b;'>None</span>"
 
     sen_color = _seniority_color(seniority) if seniority else "#64748b"
 
+    # ── Dealbreakers block ───────────────────────────────────────────────────
     dealbreaker_block = ""
     if dealbreakers:
         dealbreaker_block = f"""
@@ -255,6 +296,120 @@ def _render_ats_results(data: dict) -> str:
     {ul(dealbreakers, "#991b1b")}
   </div>"""
 
+    # ── Contact & web presence block ─────────────────────────────────────────
+    contact_block = ""
+    if contact:
+        def ci(flag: bool, label: str) -> str:
+            c  = "#16a34a" if flag else "#dc2626"
+            ic = "✓" if flag else "✗"
+            return (f'<span style="display:inline-flex;align-items:center;gap:3px;'
+                    f'font-size:.82rem;color:{c};margin:2px 10px 2px 0;">'
+                    f'<strong>{ic}</strong> {label}</span>')
+
+        flags = (
+            ci(contact.get("has_email", False),     "Email")   +
+            ci(contact.get("has_phone", False),     "Phone")   +
+            ci(contact.get("has_address", False),   "Address") +
+            ci(contact.get("has_linkedin", False),  "LinkedIn")+
+            ci(contact.get("has_github", False),    "GitHub")  +
+            ci(contact.get("has_portfolio", False), "Portfolio")
+        )
+        ci_issues = contact.get("issues", [])
+        contact_block = f"""
+  <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px;margin-bottom:12px;">
+    <strong style="font-size:.85rem;color:#475569;">Contact &amp; Web Presence</strong>
+    <div style="margin-top:6px;flex-wrap:wrap;">{flags}</div>
+    {ul(ci_issues, "#991b1b") if ci_issues else ""}
+  </div>"""
+
+    # ── Job title + word count inline row ────────────────────────────────────
+    jt_html = ""
+    if jt_match:
+        matched  = jt_match.get("matched", False)
+        jt_title = jt_match.get("job_title", "")
+        jt_note  = jt_match.get("note", "")
+        jt_col   = "#16a34a" if matched else "#dc2626"
+        jt_html  = (
+            f'<div style="flex:1;min-width:180px;background:#f8fafc;border:1px solid #e2e8f0;'
+            f'border-radius:8px;padding:10px;">'
+            f'<strong style="font-size:.8rem;color:#475569;">JOB TITLE MATCH</strong>'
+            f'<p style="margin:4px 0 0;font-size:.87rem;font-weight:600;color:{jt_col};">'
+            f'{"✓" if matched else "✗"} {jt_title}</p>'
+            f'<p style="margin:3px 0 0;font-size:.79rem;color:#64748b;">{jt_note}</p></div>'
+        )
+
+    wc_html = ""
+    if wc:
+        count  = wc.get("count", 0)
+        assess = wc.get("assessment", "")
+        wc_col = "#16a34a" if 600 <= count <= 1000 else "#d97706" if 400 <= count < 600 else "#dc2626"
+        wc_html = (
+            f'<div style="flex:1;min-width:180px;background:#f8fafc;border:1px solid #e2e8f0;'
+            f'border-radius:8px;padding:10px;">'
+            f'<strong style="font-size:.8rem;color:#475569;">WORD COUNT</strong>'
+            f'<p style="margin:4px 0 0;font-size:1rem;font-weight:700;color:{wc_col};">{count} words</p>'
+            f'<p style="margin:3px 0 0;font-size:.79rem;color:#64748b;">{assess}</p></div>'
+        )
+
+    meta_row = ""
+    if jt_html or wc_html:
+        meta_row = f'<div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;">{jt_html}{wc_html}</div>'
+
+    # ── Skill frequency table ────────────────────────────────────────────────
+    skill_freq_html = ""
+    if skill_freq:
+        rows = ""
+        for item in skill_freq:
+            sk = item.get("skill", "")
+            rc = int(item.get("resume_count", 0))
+            jc = int(item.get("jd_count", 0))
+            if rc >= jc:
+                st_col, status = "#16a34a", "✓"
+            elif rc > 0:
+                st_col, status = "#d97706", "↑ mention more"
+            else:
+                st_col, status = "#dc2626", "✗ missing"
+            rows += (
+                f'<tr style="border-bottom:1px solid #f1f5f9;">'
+                f'<td style="padding:5px 10px 5px 0;font-size:.85rem;">{sk}</td>'
+                f'<td style="padding:5px 12px;font-size:.85rem;text-align:center;">{rc}</td>'
+                f'<td style="padding:5px 12px;font-size:.85rem;text-align:center;">{jc}</td>'
+                f'<td style="padding:5px 0;font-size:.8rem;font-weight:600;color:{st_col};">{status}</td>'
+                f'</tr>'
+            )
+        skill_freq_html = f"""
+  <div style="margin-bottom:12px;">
+    <strong style="font-size:.85rem;color:#1a202c;">Skill Frequency</strong>
+    <table style="width:100%;border-collapse:collapse;margin-top:6px;">
+      <thead><tr style="border-bottom:2px solid #e2e8f0;">
+        <th style="text-align:left;font-size:.78rem;color:#64748b;padding:3px 10px 5px 0;">Skill</th>
+        <th style="font-size:.78rem;color:#64748b;padding:3px 12px;text-align:center;">Resume</th>
+        <th style="font-size:.78rem;color:#64748b;padding:3px 12px;text-align:center;">Job Description</th>
+        <th style="font-size:.78rem;color:#64748b;text-align:left;"></th>
+      </tr></thead>
+      <tbody>{rows}</tbody>
+    </table>
+  </div>"""
+
+    # ── Date format issues ───────────────────────────────────────────────────
+    date_html = ""
+    if date_issues:
+        date_html = f"""
+  <div style="margin-bottom:12px;">
+    <strong style="font-size:.85rem;color:#0f766e;">Date Formatting Issues</strong>
+    {ul(date_issues, "#134e4a")}
+  </div>"""
+
+    # ── Tone & clichés ───────────────────────────────────────────────────────
+    tone_html = ""
+    if tone:
+        tone_html = f"""
+  <div style="margin-bottom:12px;">
+    <strong style="font-size:.85rem;color:#7c3aed;">Tone &amp; Clichés</strong>
+    {ul(tone, "#5b21b6")}
+  </div>"""
+
+    # ── Assemble final HTML ──────────────────────────────────────────────────
     return f"""
 <div style="font-family:'Segoe UI',system-ui,sans-serif;padding:16px;">
 
@@ -284,8 +439,14 @@ def _render_ats_results(data: dict) -> str:
      if seniority else ""}
   </div>
 
-  <!-- Dealbreakers (shown only if present) -->
+  <!-- Dealbreakers -->
   {dealbreaker_block}
+
+  <!-- Contact & web presence -->
+  {contact_block}
+
+  <!-- Job title match + word count -->
+  {meta_row}
 
   <!-- Keywords -->
   <div style="margin-bottom:12px;">
@@ -301,6 +462,9 @@ def _render_ats_results(data: dict) -> str:
     {badges(partial, "ats-partial") if partial else "<span style='font-size:.82rem;color:#64748b;'>None</span>"}
   </div>
 
+  <!-- Skill frequency table -->
+  {skill_freq_html}
+
   <!-- Qualification gaps -->
   <div style="margin-bottom:12px;">
     <strong style="font-size:.85rem;color:#9333ea;">Qualification Gaps</strong>
@@ -312,6 +476,12 @@ def _render_ats_results(data: dict) -> str:
     <strong style="font-size:.85rem;color:#1a202c;">Structural Issues</strong>
     {ul(issues)}
   </div>
+
+  <!-- Date format issues -->
+  {date_html}
+
+  <!-- Tone & clichés -->
+  {tone_html}
 
   <!-- Weak bullets -->
   <div style="margin-bottom:12px;">
