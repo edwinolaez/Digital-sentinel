@@ -16,6 +16,7 @@ Digital Sentinel is a fully local, multi-agent AI assistant that runs on your ma
 | **Job Hunting** | Pulls live postings from RemoteOK + Arbeitnow + **Canada Job Bank** (Calgary/AB — primary resource used by SAIT career advisors, Centre for Newcomers, CCIS, and ACCES Employment); monitors **58 Calgary company career pages**; tracks every application you log. Senior/lead/manager roles filtered out automatically — only entry-level and junior postings surface |
 | **Career Page Patrol** | Autonomous agent: monitors all 58 company pages, then automatically probes and fixes any broken URLs in the same run — no user input required |
 | **Resume & Cover Letter Generator** | Paste a job URL or description, get a full functional resume (Professional Summary → Highlights → Skills → PAR-format Experience → Work History → Education) plus a 3-paragraph cover letter, auto-saved as a draft |
+| **ATS Scanner** | Dedicated tab — paste your resume and a job posting to get an instant ATS match score (0–100), colour-coded keyword badges (found / missing / partial), experience gap analysis, seniority fit verdict, dealbreaker flags, qualification gaps, weak bullet identification, and one top recommendation. Powered by a direct Gemini call; no agent round-trip |
 | **Cold Outreach** | Writes personalised cold emails + LinkedIn messages using your real background; 4-6 sentence max, specific, single ask |
 | **Profile Manager** | Single source of truth for all agents — edit your skills, projects, goals, and preferences through natural conversation |
 
@@ -27,7 +28,7 @@ Every workflow runs a security layer: all job URLs are domain-checked, all posti
 
 ```
 digital-sentinel/
-├── app.py                          ← Custom Gradio UI (replaces adk web)
+├── app.py                          ← Custom Gradio UI — two tabs: Chat + ATS Scanner
 ├── launch.bat                      ← Terminal launcher (dev use)
 ├── launch.vbs                      ← Silent launcher for desktop shortcut
 ├── pytest.ini                      ← Test discovery config
@@ -114,6 +115,30 @@ career_page_patrol invoked
   └─ Step 4: update_career_page_url(company, new_url)  ← if a live URL found
              Saves to career_url_overrides.json.
              Applied automatically on the next scan — no code edits needed.
+```
+
+### ATS Scanner — How It Works
+
+The ATS Scanner lives in its own tab and bypasses the ADK agent pipeline entirely, calling Gemini directly for sub-second turnaround.
+
+```
+User pastes resume + job posting → "Scan with ATS Analyzer" button
+  │
+  ├─ Gemini 2.5 Flash called with a strict JSON-only system prompt
+  │   Returns: match_score · verdict · keywords_found · keywords_missing
+  │            keywords_partial · structural_issues · top_recommendation
+  │
+  └─ _render_ats_results() builds the HTML card:
+       • Circular score gauge (green ≥ 80 · amber ≥ 60 · red < 60)
+       • Progress bar + one-sentence verdict
+       • Experience gap — years/level required vs. what the resume shows
+       • Seniority fit — Strong match / Slight under-qualification / Significant under-qualification / Over-qualified
+       • Dealbreakers — must-have requirements missing (auto-rejection risk, shown in red)
+       • Colour-coded keyword badges (found / missing / partial)
+       • Qualification gaps — certifications, tools, domain knowledge beyond keywords
+       • Structural issues list
+       • Weak bullets — specific resume bullets that need rewriting
+       • Top recommendation box
 ```
 
 ---
@@ -254,6 +279,17 @@ MISSION 7 — RESUME & COVER LETTER GENERATOR
   how do I match up against this posting: [text]
   show my drafts
 
+ATS SCANNER TAB (separate tab — not a chat command)
+  Open the "ATS Scanner" tab in the UI.
+  Paste your resume text in the left panel.
+  Paste the full job description in the right panel.
+  Click "Scan with ATS Analyzer".
+  Output:
+    • Match score 0–100 with colour gauge
+    • Keywords Found / Missing / Partial (colour-coded badges)
+    • Structural issues
+    • Single top recommendation
+
 MISSION 8 — COLD OUTREACH
   draft a cold email to a [role] at [Company]
   draft a LinkedIn message to the hiring manager at [Company]
@@ -343,4 +379,4 @@ application_drafts/          — Saved resume + cover letter packages
 
 ---
 
-*Built April–May 2026 — SAIT Software Development Program*
+*Built April–June 2026 — SAIT Software Development Program*

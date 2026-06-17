@@ -135,18 +135,65 @@ def _delete_draft(filename: str) -> tuple[gr.Dropdown, str]:
 
 # ── ATS Scanner ───────────────────────────────────────────────────────────────
 
-_ATS_SYSTEM_PROMPT = (
-    "You are an ATS (Applicant Tracking System) analyser. Given a resume and a job "
-    "description, return ONLY a JSON object — no markdown fences, no preamble. "
-    "The JSON must have exactly these keys: "
-    "match_score (integer 0-100), "
-    "verdict (string, one sentence), "
-    "keywords_found (list of strings), "
-    "keywords_missing (list of strings), "
-    "keywords_partial (list of strings — present but not prominent), "
-    "structural_issues (list of strings), "
-    "top_recommendation (string, one actionable sentence)"
-)
+_ATS_SYSTEM_PROMPT = """
+You are a thorough ATS (Applicant Tracking System) and hiring manager analyser.
+Given a resume and a job description, return ONLY a valid JSON object.
+No markdown fences, no preamble, no trailing commentary — raw JSON only.
+
+The JSON must have exactly these keys:
+
+match_score       — integer 0-100. Weight: 40% keywords, 25% experience/qualifications,
+                    20% bullet quality, 15% structure.
+
+verdict           — string. One sentence summarising the overall fit honestly.
+
+keywords_found    — list of strings. Exact keywords/phrases from the job posting
+                    that appear on the resume.
+
+keywords_missing  — list of strings. Exact keywords/phrases from the job posting
+                    completely absent from the resume.
+
+keywords_partial  — list of strings. Keywords present but not prominent — mentioned
+                    once, buried in a paragraph, or absent from skills/summary sections.
+
+structural_issues — list of strings. Resume format/structure problems such as:
+                    missing skills section, no measurable results in bullets,
+                    inconsistent dates, absent summary, poor section ordering.
+
+experience_gap    — string. One sentence comparing what the job requires (years,
+                    level) vs. what the resume shows.
+                    Example: "Role requires 3+ years; resume shows ~1 year via
+                    academic projects and one internship."
+
+seniority_fit     — string. Exactly one of these labels followed by a brief reason:
+                    "Strong match", "Slight under-qualification",
+                    "Significant under-qualification", "Over-qualified".
+                    Example: "Slight under-qualification — role targets mid-level
+                    but candidate is entry-level with strong project experience."
+
+dealbreakers      — list of strings. Must-have requirements from the job posting
+                    that are completely missing from the resume and would likely
+                    cause automatic rejection. Be specific — quote the requirement.
+                    Empty list if none.
+                    Example: ["AWS required — no cloud experience on resume",
+                               "3+ years Python — candidate shows ~1 year"]
+
+qualification_gaps — list of strings. Specific gaps beyond keywords: certifications,
+                    tools, methodologies, domain knowledge. State the gap and why
+                    it matters.
+                    Example: ["No CI/CD pipeline experience — job lists GitHub
+                    Actions as required", "No mention of Agile/Scrum — team uses
+                    sprint-based delivery"]
+
+weak_bullets      — list of strings. 2-4 specific resume bullets that are vague or
+                    lack measurable outcomes. Quote the bullet then note what is weak.
+                    Example: ["'Worked on frontend features' — no metric, no outcome,
+                    too vague", "'Helped with database design' — passive verb,
+                    no result stated"]
+
+top_recommendation — string. The single most impactful change to make right now.
+                     One actionable sentence.
+"""
 
 
 def _ats_score_color(score: int) -> str:
@@ -157,15 +204,28 @@ def _ats_score_color(score: int) -> str:
     return "#dc2626"       # red
 
 
+def _seniority_color(label: str) -> str:
+    if label.startswith("Strong"):
+        return "#16a34a"
+    if label.startswith("Slight"):
+        return "#d97706"
+    return "#dc2626"
+
+
 def _render_ats_results(data: dict) -> str:
-    score = int(data.get("match_score", 0))
-    color = _ats_score_color(score)
-    verdict = data.get("verdict", "")
-    found = data.get("keywords_found", [])
-    missing = data.get("keywords_missing", [])
-    partial = data.get("keywords_partial", [])
-    issues = data.get("structural_issues", [])
-    rec = data.get("top_recommendation", "")
+    score        = int(data.get("match_score", 0))
+    color        = _ats_score_color(score)
+    verdict      = data.get("verdict", "")
+    found        = data.get("keywords_found", [])
+    missing      = data.get("keywords_missing", [])
+    partial      = data.get("keywords_partial", [])
+    issues       = data.get("structural_issues", [])
+    rec          = data.get("top_recommendation", "")
+    exp_gap      = data.get("experience_gap", "")
+    seniority    = data.get("seniority_fit", "")
+    dealbreakers = data.get("dealbreakers", [])
+    qual_gaps    = data.get("qualification_gaps", [])
+    weak_bullets = data.get("weak_bullets", [])
 
     def badges(items: list, cls: str) -> str:
         return " ".join(
@@ -175,14 +235,30 @@ def _render_ats_results(data: dict) -> str:
             for item in items
         )
 
-    issues_html = (
-        "<ul style='margin:4px 0 0 18px;padding:0;'>"
-        + "".join(f"<li style='font-size:.87rem;margin:2px 0;'>{i}</li>" for i in issues)
-        + "</ul>"
-    ) if issues else "<span style='font-size:.87rem;color:#64748b;'>None found</span>"
+    def ul(items: list, color: str = "#1a202c") -> str:
+        return (
+            "<ul style='margin:4px 0 0 18px;padding:0;'>"
+            + "".join(
+                f"<li style='font-size:.87rem;margin:3px 0;color:{color};'>{i}</li>"
+                for i in items
+            )
+            + "</ul>"
+        ) if items else f"<span style='font-size:.82rem;color:#64748b;'>None</span>"
+
+    sen_color = _seniority_color(seniority) if seniority else "#64748b"
+
+    dealbreaker_block = ""
+    if dealbreakers:
+        dealbreaker_block = f"""
+  <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:12px;margin-bottom:12px;">
+    <strong style="font-size:.85rem;color:#dc2626;">⚠ Dealbreakers (auto-rejection risk)</strong>
+    {ul(dealbreakers, "#991b1b")}
+  </div>"""
 
     return f"""
 <div style="font-family:'Segoe UI',system-ui,sans-serif;padding:16px;">
+
+  <!-- Score gauge + verdict -->
   <div style="display:flex;align-items:center;gap:20px;margin-bottom:16px;">
     <div style="width:80px;height:80px;border-radius:50%;border:5px solid {color};
                 display:flex;align-items:center;justify-content:center;flex-shrink:0;">
@@ -196,6 +272,22 @@ def _render_ats_results(data: dict) -> str:
     </div>
   </div>
 
+  <!-- Experience + seniority row -->
+  <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
+    {"<div style='flex:1;min-width:200px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px;'>"
+     + "<strong style='font-size:.8rem;color:#475569;'>EXPERIENCE GAP</strong>"
+     + f"<p style='margin:4px 0 0;font-size:.87rem;color:#1a202c;'>{exp_gap}</p></div>"
+     if exp_gap else ""}
+    {"<div style='flex:1;min-width:200px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px;'>"
+     + "<strong style='font-size:.8rem;color:#475569;'>SENIORITY FIT</strong>"
+     + f"<p style='margin:4px 0 0;font-size:.87rem;font-weight:600;color:{sen_color};'>{seniority}</p></div>"
+     if seniority else ""}
+  </div>
+
+  <!-- Dealbreakers (shown only if present) -->
+  {dealbreaker_block}
+
+  <!-- Keywords -->
   <div style="margin-bottom:12px;">
     <strong style="font-size:.85rem;color:#16a34a;">Keywords Found</strong><br>
     {badges(found, "ats-hit") if found else "<span style='font-size:.82rem;color:#64748b;'>None</span>"}
@@ -209,15 +301,30 @@ def _render_ats_results(data: dict) -> str:
     {badges(partial, "ats-partial") if partial else "<span style='font-size:.82rem;color:#64748b;'>None</span>"}
   </div>
 
+  <!-- Qualification gaps -->
   <div style="margin-bottom:12px;">
-    <strong style="font-size:.85rem;color:#1a202c;">Structural Issues</strong>
-    {issues_html}
+    <strong style="font-size:.85rem;color:#9333ea;">Qualification Gaps</strong>
+    {ul(qual_gaps, "#6b21a8")}
   </div>
 
+  <!-- Structural issues -->
+  <div style="margin-bottom:12px;">
+    <strong style="font-size:.85rem;color:#1a202c;">Structural Issues</strong>
+    {ul(issues)}
+  </div>
+
+  <!-- Weak bullets -->
+  <div style="margin-bottom:12px;">
+    <strong style="font-size:.85rem;color:#b45309;">Weak Bullets to Rewrite</strong>
+    {ul(weak_bullets, "#92400e")}
+  </div>
+
+  <!-- Top recommendation -->
   <div style="background:#f0f4ff;border:1px solid #c7d7f8;border-radius:8px;padding:12px;margin-top:8px;">
     <strong style="font-size:.85rem;color:#3b82f6;">Top Recommendation</strong>
     <p style="margin:6px 0 0;font-size:.9rem;color:#1a202c;">{rec}</p>
   </div>
+
 </div>
 """
 
