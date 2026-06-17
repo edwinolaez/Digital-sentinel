@@ -499,9 +499,330 @@ def _render_ats_results(data: dict) -> str:
 """
 
 
-async def run_ats_scan(resume_text: str, job_text: str) -> str:
-    if not resume_text.strip() or not job_text.strip():
-        return '<p style="color:#dc2626;padding:12px;">Please paste both your resume and the job posting.</p>'
+# ── ATS-safe font list ────────────────────────────────────────────────────────
+
+_ATS_SAFE_FONTS = {
+    "Arial", "Calibri", "Cambria", "Times New Roman", "Times-Roman", "Times",
+    "Helvetica", "Helvetica Neue", "Georgia", "Garamond", "Book Antiqua",
+    "Palatino Linotype", "Palatino", "Trebuchet MS", "Verdana", "Tahoma",
+    "Century Gothic", "Gill Sans MT", "Constantia", "Corbel", "Didot",
+}
+
+# ── File parsers ──────────────────────────────────────────────────────────────
+
+def _analyze_docx(path: str) -> tuple[str, dict]:
+    try:
+        from docx import Document
+        from docx.oxml.ns import qn
+    except ImportError:
+        return "", {"error": "python-docx not installed. Run: pip install python-docx"}
+
+    doc = Document(path)
+
+    # Text — paragraphs + tables
+    parts = [p.text for p in doc.paragraphs if p.text.strip()]
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                if cell.text.strip():
+                    parts.append(cell.text.strip())
+    text = "\n".join(parts)
+
+    # Fonts + sizes (explicit runs; fall back to Normal style default)
+    fonts: set[str] = set()
+    sizes: set[int] = set()
+    default_font = None
+    try:
+        default_font = doc.styles["Normal"].font.name
+        if default_font:
+            fonts.add(default_font)
+    except Exception:
+        pass
+    for para in doc.paragraphs:
+        for run in para.runs:
+            if run.font.name:
+                fonts.add(run.font.name)
+            if run.font.size:
+                try:
+                    sizes.add(round(run.font.size.pt))
+                except Exception:
+                    pass
+
+    # Margins
+    margins: dict = {}
+    if doc.sections:
+        try:
+            s = doc.sections[0]
+            margins = {
+                "top":    round(s.top_margin.inches, 2),
+                "bottom": round(s.bottom_margin.inches, 2),
+                "left":   round(s.left_margin.inches, 2),
+                "right":  round(s.right_margin.inches, 2),
+            }
+        except Exception:
+            pass
+
+    # Text boxes (ATS cannot read these)
+    has_text_boxes = bool(doc.element.findall(".//" + qn("w:txbxContent")))
+
+    # Tables used for layout
+    has_tables = len(doc.tables) > 0
+
+    # Headers / footers with actual content
+    has_header = False
+    has_footer = False
+    for section in doc.sections:
+        try:
+            if any(p.text.strip() for p in section.header.paragraphs):
+                has_header = True
+            if any(p.text.strip() for p in section.footer.paragraphs):
+                has_footer = True
+        except Exception:
+            pass
+
+    # Multi-column layout
+    is_multi_column = False
+    for section in doc.sections:
+        try:
+            cols_el = section._sectPr.find(qn("w:cols"))
+            if cols_el is not None and int(cols_el.get(qn("w:num"), 1)) > 1:
+                is_multi_column = True
+        except Exception:
+            pass
+
+    # Page count: count explicit page breaks + 1
+    page_breaks = 0
+    for para in doc.paragraphs:
+        for run in para.runs:
+            if "\x0c" in run.text:
+                page_breaks += 1
+        try:
+            pPr = para._element.find(qn("w:pPr"))
+            if pPr is not None:
+                pb = pPr.find(qn("w:pageBreakBefore"))
+                if pb is not None and pb.get(qn("w:val"), "true") != "false":
+                    page_breaks += 1
+        except Exception:
+            pass
+    page_count = max(1, page_breaks + 1)
+
+    return text, {
+        "file_type":       "docx",
+        "fonts":           sorted(fonts),
+        "font_sizes":      sorted(sizes),
+        "margins":         margins,
+        "has_text_boxes":  has_text_boxes,
+        "has_tables":      has_tables,
+        "has_header":      has_header,
+        "has_footer":      has_footer,
+        "is_multi_column": is_multi_column,
+        "page_count":      page_count,
+        "word_count":      len(text.split()),
+        "is_image_based":  False,
+    }
+
+
+def _analyze_pdf(path: str) -> tuple[str, dict]:
+    try:
+        import fitz  # PyMuPDF
+    except ImportError:
+        return "", {"error": "PyMuPDF not installed. Run: pip install PyMuPDF"}
+
+    doc = fitz.open(path)
+    page_count = len(doc)
+
+    full_text = "".join(page.get_text() for page in doc)
+    is_image_based = not full_text.strip()
+
+    fonts: set[str] = set()
+    sizes: set[int] = set()
+    for page in doc:
+        try:
+            for block in page.get_text("dict")["blocks"]:
+                if block.get("type") == 0:
+                    for line in block.get("lines", []):
+                        for span in line.get("spans", []):
+                            raw_font = span.get("font", "")
+                            if raw_font:
+                                fonts.add(raw_font.split("+")[-1])
+                            if span.get("size"):
+                                sizes.add(round(span["size"]))
+        except Exception:
+            pass
+    doc.close()
+
+    return full_text, {
+        "file_type":       "pdf",
+        "fonts":           sorted(fonts),
+        "font_sizes":      sorted(sizes),
+        "margins":         {},
+        "has_text_boxes":  None,
+        "has_tables":      None,
+        "has_header":      None,
+        "has_footer":      None,
+        "is_multi_column": None,
+        "page_count":      page_count,
+        "word_count":      len(full_text.split()),
+        "is_image_based":  is_image_based,
+    }
+
+
+def _analyze_file(file) -> tuple[str, dict]:
+    if file is None:
+        return "", {}
+    path     = file.name if hasattr(file, "name") else str(file)
+    orig     = getattr(file, "orig_name", None) or os.path.basename(path)
+    ext      = os.path.splitext(orig)[1].lower()
+
+    if ext == ".docx":
+        text, meta = _analyze_docx(path)
+    elif ext == ".pdf":
+        text, meta = _analyze_pdf(path)
+    else:
+        return "", {"file_type": "unsupported", "filename": orig,
+                    "error": f"Unsupported file type '{ext}'. Please upload a .docx or .pdf file."}
+
+    meta["filename"] = orig
+    return text, meta
+
+
+# ── File analysis renderer ────────────────────────────────────────────────────
+
+def _render_file_analysis(meta: dict) -> str:
+    if not meta:
+        return ""
+    if "error" in meta:
+        return f'<p style="color:#dc2626;padding:8px 0;">[File Error] {meta["error"]}</p>'
+
+    ft        = meta.get("file_type", "")
+    filename  = meta.get("filename", "resume")
+    pages     = meta.get("page_count", 1)
+    words     = meta.get("word_count", 0)
+    fonts     = meta.get("fonts", [])
+    sizes     = meta.get("font_sizes", [])
+    margins   = meta.get("margins", {})
+    txt_boxes = meta.get("has_text_boxes")
+    tables    = meta.get("has_tables")
+    header    = meta.get("has_header")
+    footer    = meta.get("has_footer")
+    multicol  = meta.get("is_multi_column")
+    img_based = meta.get("is_image_based", False)
+
+    def row(ok: bool, label: str, detail: str = "") -> str:
+        icon  = "✓" if ok else "✗"
+        color = "#16a34a" if ok else "#dc2626"
+        det   = f' <span style="color:#64748b;font-weight:400;"> — {detail}</span>' if detail else ""
+        return (f'<div style="display:flex;align-items:flex-start;gap:8px;'
+                f'padding:4px 0;border-bottom:1px solid #f1f5f9;">'
+                f'<span style="color:{color};font-weight:700;min-width:14px;">{icon}</span>'
+                f'<span style="font-size:.85rem;color:#1a202c;font-weight:600;">{label}</span>'
+                f'{det}</div>')
+
+    checks = []
+
+    # File type
+    ft_ok = ft in ("docx", "pdf")
+    checks.append(row(ft_ok, f"File type — .{ft.upper()}",
+                      "ATS-compatible" if ft_ok else "Upload .docx or .pdf"))
+
+    # File name
+    import re as _re
+    name_ok = not bool(_re.search(r'[^A-Za-z0-9._\-\s]', filename))
+    checks.append(row(name_ok, f"File name — {filename}",
+                      "Clean" if name_ok else "Remove special characters from filename"))
+
+    # Image-based PDF
+    if ft == "pdf" and img_based:
+        checks.append(row(False, "Image-based PDF",
+                          "ATS cannot read scanned/image PDFs — export from Word or Google Docs instead"))
+    elif ft == "pdf":
+        checks.append(row(True, "Text-based PDF", "ATS can read this file"))
+
+    # Page count
+    pages_ok = pages <= 2
+    pages_note = "ideal for entry-level" if pages == 1 else "acceptable" if pages == 2 else f"{pages} pages — trim to 2 max"
+    checks.append(row(pages_ok, f"Page count — {pages} page{'s' if pages != 1 else ''}", pages_note))
+
+    # Fonts
+    if fonts:
+        unsafe = [f for f in fonts if f not in _ATS_SAFE_FONTS]
+        fonts_ok = len(unsafe) == 0
+        font_str = ", ".join(fonts[:4]) + ("…" if len(fonts) > 4 else "")
+        checks.append(row(fonts_ok, f"Fonts — {font_str}",
+                          "ATS-safe" if fonts_ok else f"Risky font(s): {', '.join(unsafe)} — switch to Calibri or Arial"))
+    else:
+        checks.append(row(True, "Fonts", "No unusual fonts detected"))
+
+    # Font sizes
+    if sizes:
+        body_sizes = [s for s in sizes if 9 <= s <= 13]
+        sizes_ok   = len(body_sizes) > 0
+        sizes_str  = ", ".join(str(s) + "pt" for s in sorted(sizes))
+        checks.append(row(sizes_ok, f"Font sizes — {sizes_str}",
+                          "Good range" if sizes_ok else "Body text should be 10–12pt"))
+
+    # Margins (DOCX only)
+    if margins:
+        m_vals   = list(margins.values())
+        margin_ok = all(0.5 <= v <= 1.25 for v in m_vals)
+        m_str    = f'{margins.get("top",0)}" top/bottom · {margins.get("left",0)}" left/right'
+        checks.append(row(margin_ok, f"Margins — {m_str}",
+                          "Standard" if margin_ok else "Keep margins between 0.5\"–1.25\""))
+
+    # Text boxes (DOCX)
+    if txt_boxes is not None:
+        checks.append(row(not txt_boxes, "Text boxes",
+                          "None found" if not txt_boxes else "Text boxes detected — ATS cannot read them; move content to regular paragraphs"))
+
+    # Multi-column (DOCX)
+    if multicol is not None:
+        checks.append(row(not multicol, "Layout",
+                          "Single column (ATS-friendly)" if not multicol else "Multi-column layout detected — some ATS struggle with columns"))
+
+    # Headers with content (DOCX)
+    if header is not None:
+        checks.append(row(not header, "Header",
+                          "Empty (good)" if not header else "Contains content — ATS often skips headers; move key info to the body"))
+
+    # Footers with content (DOCX)
+    if footer is not None:
+        checks.append(row(not footer, "Footer",
+                          "Empty (good)" if not footer else "Contains content — ATS often skips footers"))
+
+    ft_badge_color = "#16a34a" if ft in ("docx", "pdf") else "#dc2626"
+    checks_html = "".join(checks)
+
+    return f"""
+<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin-bottom:16px;">
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap;">
+    <span style="font-size:1.1rem;">📄</span>
+    <strong style="font-size:.9rem;color:#1a202c;">{filename}</strong>
+    <span style="background:{ft_badge_color};color:#fff;font-size:.75rem;font-weight:700;
+                 padding:2px 8px;border-radius:10px;">.{ft.upper()}</span>
+    <span style="font-size:.82rem;color:#64748b;">{pages} page{'s' if pages != 1 else ''}</span>
+    <span style="font-size:.82rem;color:#64748b;">·</span>
+    <span style="font-size:.82rem;color:#64748b;">{words} words</span>
+  </div>
+  <strong style="font-size:.8rem;color:#475569;letter-spacing:.04em;">FILE CHECKS</strong>
+  <div style="margin-top:6px;">{checks_html}</div>
+</div>
+"""
+
+
+# ── ATS scan runner ───────────────────────────────────────────────────────────
+
+async def run_ats_scan(resume_file, job_text: str) -> str:
+    if resume_file is None:
+        return '<p style="color:#dc2626;padding:12px;">Please upload your resume file (.docx or .pdf).</p>'
+    if not job_text.strip():
+        return '<p style="color:#dc2626;padding:12px;">Please paste the job description.</p>'
+
+    resume_text, file_meta = _analyze_file(resume_file)
+
+    if not resume_text.strip():
+        file_html = _render_file_analysis(file_meta)
+        msg = file_meta.get("error", "Could not extract text from this file.")
+        return file_html + f'<p style="color:#dc2626;padding:8px 0;">{msg}</p>'
 
     try:
         import google.genai as genai
@@ -514,20 +835,20 @@ async def run_ats_scan(resume_text: str, job_text: str) -> str:
             ),
         )
         raw = response.text.strip()
-        # Strip markdown fences if model adds them despite instructions
         if raw.startswith("```"):
             raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
         if raw.endswith("```"):
             raw = raw.rsplit("```", 1)[0]
         data = json.loads(raw.strip())
-        return _render_ats_results(data)
+        return _render_file_analysis(file_meta) + _render_ats_results(data)
     except json.JSONDecodeError:
         return (
-            f'<p style="color:#dc2626;padding:12px;">Could not parse JSON response.</p>'
-            f'<pre style="font-size:.8rem;white-space:pre-wrap;padding:12px;">{raw}</pre>'
+            _render_file_analysis(file_meta)
+            + f'<p style="color:#dc2626;padding:12px;">Could not parse Gemini response.</p>'
+            + f'<pre style="font-size:.8rem;white-space:pre-wrap;padding:12px;">{raw}</pre>'
         )
     except Exception as e:
-        return f'<p style="color:#dc2626;padding:12px;">[ATS Error] {e}</p>'
+        return _render_file_analysis(file_meta) + f'<p style="color:#dc2626;padding:12px;">[ATS Error] {e}</p>'
 
 
 # ── CSS ───────────────────────────────────────────────────────────────────────
@@ -775,7 +1096,12 @@ body, .gradio-container {
 #delete-draft-btn:hover { background: #b91c1c !important; }
 
 /* ── ATS Scanner tab ── */
-#ats-resume-input textarea,
+#ats-resume-file {
+    border: 2px dashed #c7d7f8 !important;
+    border-radius: 8px !important;
+    background: #f8faff !important;
+    min-height: 120px !important;
+}
 #ats-job-input textarea {
     background: #ffffff !important;
     color: #1a202c !important;
@@ -786,7 +1112,6 @@ body, .gradio-container {
     line-height: 1.55 !important;
     padding: 9px 12px !important;
 }
-#ats-resume-input textarea:focus,
 #ats-job-input textarea:focus { border-color: #3b82f6 !important; outline: none !important; }
 #ats-scan-btn {
     background: #7c3aed !important;
@@ -923,7 +1248,8 @@ const DARK_CSS = `
   }
 
   /* ── ATS Scanner tab — dark mode ── */
-  #ats-resume-input textarea,
+  #ats-resume-file { background: #0f172a !important; border-color: #334155 !important; }
+  #ats-resume-file * { color: #94a3b8 !important; }
   #ats-job-input textarea { background: #0f172a !important; color: #f1f5f9 !important; border-color: #334155 !important; }
   #ats-results { background: #1e293b !important; color: #f1f5f9 !important; border-color: #334155 !important; }
   .ats-badge.ats-hit     { background: #14532d !important; color: #bbf7d0 !important; }
@@ -1083,11 +1409,10 @@ def build_ui() -> gr.Blocks:
 
                 with gr.Row():
                     with gr.Column():
-                        resume_input = gr.Textbox(
-                            label="Your Resume",
-                            lines=20,
-                            placeholder="Paste your resume text here...",
-                            elem_id="ats-resume-input",
+                        resume_file = gr.File(
+                            label="Your Resume (.docx or .pdf)",
+                            file_types=[".docx", ".pdf"],
+                            elem_id="ats-resume-file",
                         )
                     with gr.Column():
                         job_input = gr.Textbox(
@@ -1165,7 +1490,7 @@ def build_ui() -> gr.Blocks:
         # ATS Scanner: run scan on button click
         ats_scan_btn.click(
             fn=run_ats_scan,
-            inputs=[resume_input, job_input],
+            inputs=[resume_file, job_input],
             outputs=[ats_results],
         )
 
